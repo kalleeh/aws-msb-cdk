@@ -34,11 +34,9 @@ These controls are partially implemented but have gaps that prevent complete tes
 
 | Control ID | Description | Framework Reference | Gap Description |
 |------------|-------------|---------------------|----------------|
-| SNS.1 | SNS topic encryption | FSBP, DAT.8 | SNS topics are created but not encrypted with KMS |
 | SSB.LOG.10 | Centralized log management | AWS SSB | Logs are centralized but full log analysis is not implemented |
 | SSB.IR.8 | Automated remediation | AWS SSB | Limited automated remediation is implemented |
 | SSB.NET.9 | Network segmentation | AWS SSB | Basic network segmentation is implemented but may not meet all requirements |
-| EC2.15 | VPC endpoint security | FSBP, NET.6 | VPC endpoints are not fully implemented in the current stack |
 | IAM.8 | IAM Access Analyzer alerts | FSBP, IR.6 | Access Analyzer is enabled but alerts are not fully implemented |
 | IAM.16 | IAM policies attached only to groups or roles | FSBP | Implementation exists but needs to be integrated into the main stack |
 
