@@ -8,7 +8,6 @@ These controls can only be verified at runtime after deployment, not during CDK 
 
 | Control ID | Description | Framework Reference | Reason |
 |------------|-------------|---------------------|--------|
-| CloudTrail.2 | CloudTrail logs encrypted | FSBP, CIS 3.5, DAT.7 | Encryption effectiveness can only be verified at runtime |
 | GuardDuty.1 | GuardDuty enabled | FSBP, CIS 3.8, LOG.7 | While we test resource creation, actual threat detection requires runtime verification |
 | SecurityHub.1 | Security Hub enabled | FSBP, CIS 3.10, LOG.8 | While we test resource creation, integration functionality requires runtime verification |
 | IAM.8 | IAM Access Analyzer findings | FSBP, CIS 1.20, IR.6 | Finding generation and alerting requires runtime verification |
@@ -50,7 +49,6 @@ These controls are difficult to test due to limitations in the testing framework
 | Control ID | Description | Framework Reference | Testing Challenge |
 |------------|-------------|---------------------|------------------|
 | CIS 3.3 | CloudTrail log file validation | CIS 3.0.0 | Difficult to verify validation effectiveness in tests |
-| CIS 3.7 | CloudTrail logs encrypted with KMS CMKs | CIS 3.0.0 | Difficult to verify KMS encryption in tests |
 | CIS 5.5 | VPC peering routing tables | CIS 3.0.0 | Complex to test peering configurations |
 | IAM.16 | IAM policies attached only to groups or roles | FSBP | Requires complex policy analysis |
 | CIS 4.1-4.16 | Various monitoring controls | CIS 3.0.0 | Requires complex event pattern testing |

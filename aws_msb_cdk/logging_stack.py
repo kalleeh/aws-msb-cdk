@@ -6,13 +6,14 @@ from aws_cdk import (
     aws_logs as logs,
     aws_sns as sns,
     aws_sns_subscriptions as sns_subs,
+    aws_kms as kms,
     RemovalPolicy,
     Duration,
 )
 from constructs import Construct
 
 class LoggingStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # S3 Bucket for Logs using secure bucket configuration if available
@@ -69,7 +70,35 @@ class LoggingStack(Stack):
                 sns_subs.EmailSubscription(notification_email)
             )
 
-        # CloudTrail using L2 construct
+        # Get KMS key for CloudTrail encryption if available
+        cloudtrail_key = None
+        if kms_stack and hasattr(kms_stack, 'cloudtrail_key'):
+            cloudtrail_key = kms_stack.cloudtrail_key
+        else:
+            # Create a new KMS key for CloudTrail if not provided
+            cloudtrail_key = kms.Key(self, "CloudTrailKey",
+                alias=f"alias/msb-cloudtrail-key-{self.region}",
+                description="KMS key for CloudTrail encryption",
+                enable_key_rotation=True,
+                removal_policy=RemovalPolicy.RETAIN
+            )
+            
+            # Add CloudTrail service principal to key policy
+            cloudtrail_key.add_to_resource_policy(
+                iam.PolicyStatement(
+                    sid="AllowCloudTrailToEncryptLogs",
+                    actions=["kms:GenerateDataKey*"],
+                    principals=[iam.ServicePrincipal("cloudtrail.amazonaws.com")],
+                    resources=["*"],
+                    conditions={
+                        "StringLike": {
+                            "kms:EncryptionContext:aws:cloudtrail:arn": f"arn:aws:cloudtrail:*:{self.account}:trail/*"
+                        }
+                    }
+                )
+            )
+
+        # CloudTrail using L2 construct with KMS encryption
         trail = cloudtrail.Trail(self, "CloudTrail",
             bucket=logs_bucket,
             send_to_cloud_watch_logs=True,
@@ -78,7 +107,8 @@ class LoggingStack(Stack):
             include_global_service_events=True,
             enable_file_validation=True,
             management_events=cloudtrail.ReadWriteType.ALL,
-            trail_name="msb-cloudtrail"
+            trail_name="msb-cloudtrail",
+            encryption_key=cloudtrail_key  # Add KMS encryption (correct parameter name)
         )
         
         # Enable data events for S3 and Lambda
@@ -130,3 +160,4 @@ class LoggingStack(Stack):
         self.logs_bucket = logs_bucket
         self.notifications_topic = notifications_topic
         self.config_role = config_role
+        self.cloudtrail_key = cloudtrail_key

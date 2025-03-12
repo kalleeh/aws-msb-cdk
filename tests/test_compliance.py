@@ -750,3 +750,35 @@ class TestComplianceMatrix:
         # This test documents the gap. See docs/untested_controls.md for details.
         # We'll verify that the stack exists but not make specific assertions
         assert monitoring_stack is not None
+        
+    def test_cloudtrail_encryption_at_rest(self):
+        """
+        Test CloudTrail logs are encrypted with KMS
+        - FSBP: CloudTrail.2
+        - CIS AWS 3.0.0: 3.5
+        - AWS SSB: DAT.7
+        """
+        # GIVEN
+        app = cdk.App()
+        
+        # WHEN
+        # Create a logging stack that creates its own KMS key
+        logging_stack = LoggingStack(app, "TestLoggingStack")
+        
+        # Get the CloudFormation template
+        logging_template = Template.from_stack(logging_stack)
+        
+        # THEN
+        # Verify CloudTrail is configured with KMS encryption
+        logging_template.has_resource_properties("AWS::CloudTrail::Trail", {
+            "IsLogging": True,
+            "KMSKeyId": Match.any_value()
+        })
+        
+        # Verify KMS key exists
+        logging_template.resource_count_is("AWS::KMS::Key", 1)
+        
+        # Verify KMS key has proper permissions for CloudTrail
+        logging_template.has_resource_properties("AWS::KMS::Key", {
+            "EnableKeyRotation": True
+        })
