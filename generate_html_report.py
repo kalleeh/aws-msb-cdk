@@ -20,7 +20,7 @@ def extract_test_results():
     try:
         # Run pytest and capture output
         result = subprocess.run(
-            ["python", "-m", "pytest", "tests/test_compliance.py", "-v"],
+            ["python3", "-m", "pytest", "tests/test_compliance.py", "-v"],
             capture_output=True,
             text=True
         )
