@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_events as events,
     aws_events_targets as targets,
+    aws_accessanalyzer as accessanalyzer,
     Duration,
     CfnResource
 )
@@ -21,6 +22,9 @@ class IAMStack(Stack):
         
         # Create IAM policy checker for IAM.16 compliance
         self.create_iam_policy_checker()
+        
+        # Create IAM Access Analyzer (CIS 1.20)
+        self.create_access_analyzer()
         
     def create_password_policy(self):
         """Create IAM password policy that meets CIS benchmarks"""
@@ -108,4 +112,13 @@ class IAMStack(Stack):
                 }
             ),
             targets=[targets.LambdaFunction(iam_policy_checker)]
+        )
+        
+    def create_access_analyzer(self):
+        """Create IAM Access Analyzer for external access analysis (CIS 1.20)"""
+        
+        # Create IAM Access Analyzer
+        accessanalyzer.CfnAnalyzer(self, "IAMAccessAnalyzer",
+            analyzer_name=f"msb-access-analyzer-{self.account}-{self.region}",
+            type="ACCOUNT"
         )

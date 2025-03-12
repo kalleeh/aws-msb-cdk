@@ -157,27 +157,27 @@
 </head>
 <body>
     <h1>Compliance Test Coverage Report</h1>
-    <p>Generated on 2025-03-12 02:19:02</p>
+    <p>Generated on 2025-03-12 04:03:13</p>
     
     <div class="summary">
         <div class="summary-box">
             <h2>Coverage Summary</h2>
-            <p>Overall Coverage: <strong>64.4%</strong></p>
+            <p>Overall Coverage: <strong>22.2%</strong></p>
             <div class="progress-container">
-                <div class="progress-bar" style="width: 64.44444444444444%">
-                    64.4%
+                <div class="progress-bar" style="width: 22.22222222222222%">
+                    22.2%
                 </div>
             </div>
             <p>Total Controls: 45</p>
-            <p>Covered Controls: 29</p>
-            <p>Uncovered Controls: 16</p>
+            <p>Covered Controls: 10</p>
+            <p>Uncovered Controls: 35</p>
         </div>
         
         <div class="summary-box">
             <h2>Test Status Summary</h2>
-            <p>Total Tests: 27</p>
-            <p><span class="passed">✓ Passed:</span> 27</p>
-            <p><span class="failed">✗ Failed:</span> 0</p>
+            <p>Total Tests: 5</p>
+            <p><span class="passed">✓ Passed:</span> 4</p>
+            <p><span class="failed">✗ Failed:</span> 1</p>
             <p><span class="skipped">⚠ Skipped:</span> 0</p>
             <p><span class="unknown">? Unknown:</span> 0</p>
         </div>
@@ -193,36 +193,12 @@
         </tr>
 
         <tr>
-            <td>AWS Config Enabled</td>
-            <td>Ensure AWS Config is enabled</td>
-            <td>FSBP: Config.1; CIS AWS 3.0.0: 3.5; AWS SSB: LOG.6</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_aws_config_enabled" class="test-link">test_aws_config_enabled</a>
-                <span class="tooltiptext">Test AWS Config is enabled</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_config_rules_for_compliance" class="test-link">test_config_rules_for_compliance</a>
-                <span class="tooltiptext">Test AWS Config Rules for compliance monitoring</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>AWS Config Rules</td>
-            <td>Ensure AWS Config Rules are configured for compliance monitoring</td>
-            <td>FSBP: Config.1; CIS AWS 3.0.0: 3.5; AWS SSB: COM.1, LOG.6</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_aws_config_enabled" class="test-link">test_aws_config_enabled</a>
-                <span class="tooltiptext">Test AWS Config is enabled</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_config_rules_for_compliance" class="test-link">test_config_rules_for_compliance</a>
-                <span class="tooltiptext">Test AWS Config Rules for compliance monitoring</span>
-            </div></span></td>
-        </tr>
-        <tr>
             <td>Access Keys Rotated</td>
             <td>Ensure access keys are rotated every 90 days or less</td>
             <td>FSBP: IAM.3; CIS AWS 3.0.0: 1.14; AWS SSB: IAM.4</td>
             <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_access_keys_rotated" class="test-link">test_access_keys_rotated</a>
-                <span class="tooltiptext">Test access keys rotation monitoring</span>
+                <a href="#test-test_iam_password_policy" class="test-link">test_iam_password_policy</a>
+                <span class="tooltiptext">Test IAM password policy meets CIS benchmarks</span>
             </div></span></td>
         </tr>
         <tr>
@@ -235,84 +211,39 @@
             </div></span></td>
         </tr>
         <tr>
-            <td>CloudTrail Log Encryption</td>
-            <td>Ensure CloudTrail logs are encrypted</td>
-            <td>FSBP: CloudTrail.2; CIS AWS 3.0.0: 3.5; AWS SSB: DAT.7</td>
+            <td>CloudTrail Log File Validation</td>
+            <td>Ensure CloudTrail log file validation is enabled</td>
+            <td>CIS AWS 3.0.0: 3.3</td>
             <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_aws_config_enabled" class="test-link">test_aws_config_enabled</a>
-                <span class="tooltiptext">Test AWS Config is enabled</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_config_rules_for_compliance" class="test-link">test_config_rules_for_compliance</a>
-                <span class="tooltiptext">Test AWS Config Rules for compliance monitoring</span>
+                <a href="#test-test_cloudtrail_enabled_and_configured" class="test-link">test_cloudtrail_enabled_and_configured</a>
+                <span class="tooltiptext">Test CloudTrail is enabled and properly configured</span>
             </div></span></td>
         </tr>
         <tr>
-            <td>CloudWatch Log Group Retention</td>
-            <td>Ensure CloudWatch Log Groups have retention periods set</td>
-            <td>FSBP: CloudWatch.1; CIS AWS 3.0.0: 3.4; AWS SSB: LOG.5</td>
+            <td>Hardware MFA for Root</td>
+            <td>Ensure hardware MFA is enabled for the root account</td>
+            <td>FSBP: IAM.4; CIS AWS 3.0.0: 1.13; AWS SSB: IAM.5</td>
             <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_cloudwatch_log_group_retention" class="test-link">test_cloudwatch_log_group_retention</a>
-                <span class="tooltiptext">Test CloudWatch Log Group retention</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Default Security Group Restrictions</td>
-            <td>Ensure default security groups restrict all traffic</td>
-            <td>FSBP: EC2.2; CIS AWS 3.0.0: 5.4; AWS SSB: NET.2</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_default_security_group_restrictions" class="test-link">test_default_security_group_restrictions</a>
-                <span class="tooltiptext">Test default security groups are restricted</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>EBS Encryption by Default</td>
-            <td>Ensure EBS volumes are encrypted by default</td>
-            <td>FSBP: EC2.7; CIS AWS 3.0.0: 2.2.1; AWS SSB: DAT.5</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_ebs_encryption_by_default" class="test-link">test_ebs_encryption_by_default</a>
-                <span class="tooltiptext">Test EBS encryption by default</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>GuardDuty Enabled</td>
-            <td>Ensure GuardDuty is enabled</td>
-            <td>FSBP: GuardDuty.1; CIS AWS 3.0.0: 3.8; AWS SSB: LOG.7</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_guardduty_enabled" class="test-link">test_guardduty_enabled</a>
-                <span class="tooltiptext">Test GuardDuty is enabled</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>GuardDuty Findings Alerts</td>
-            <td>Ensure GuardDuty findings are monitored and alerted</td>
-            <td>FSBP: GuardDuty.4; AWS SSB: IR.4</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_guardduty_findings_alerts" class="test-link">test_guardduty_findings_alerts</a>
-                <span class="tooltiptext">Test GuardDuty findings alerts</span>
+                <a href="#test-test_iam_password_policy" class="test-link">test_iam_password_policy</a>
+                <span class="tooltiptext">Test IAM password policy meets CIS benchmarks</span>
             </div></span></td>
         </tr>
         <tr>
             <td>IAM Access Analyzer</td>
             <td>Ensure IAM Access Analyzer is enabled</td>
             <td>FSBP: IAM.8; CIS AWS 3.0.0: 1.20; AWS SSB: IAM.6</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_iam_access_analyzer_enabled" class="test-link">test_iam_access_analyzer_enabled</a>
+            <td><span class="failed">✗ <div class="tooltip">
+                <a href="#test-test_iam_access_analyzer" class="test-link">test_iam_access_analyzer</a>
                 <span class="tooltiptext">Test IAM Access Analyzer is enabled</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_iam_access_analyzer_alerts" class="test-link">test_iam_access_analyzer_alerts</a>
-                <span class="tooltiptext">Test IAM Access Analyzer alerts</span>
             </div></span></td>
         </tr>
         <tr>
             <td>IAM Access Analyzer Alerts</td>
             <td>Ensure IAM Access Analyzer findings are monitored and alerted</td>
             <td>FSBP: IAM.8; AWS SSB: IR.6</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_iam_access_analyzer_enabled" class="test-link">test_iam_access_analyzer_enabled</a>
+            <td><span class="failed">✗ <div class="tooltip">
+                <a href="#test-test_iam_access_analyzer" class="test-link">test_iam_access_analyzer</a>
                 <span class="tooltiptext">Test IAM Access Analyzer is enabled</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_iam_access_analyzer_alerts" class="test-link">test_iam_access_analyzer_alerts</a>
-                <span class="tooltiptext">Test IAM Access Analyzer alerts</span>
             </div></span></td>
         </tr>
         <tr>
@@ -320,17 +251,17 @@
             <td>Ensure IAM password policy meets security requirements</td>
             <td>FSBP: IAM.9; CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11; AWS SSB: IAM.1</td>
             <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_iam_password_policy_compliance" class="test-link">test_iam_password_policy_compliance</a>
-                <span class="tooltiptext">Test IAM password policy meets CIS AWS 3.0.0 requirements</span>
+                <a href="#test-test_iam_password_policy" class="test-link">test_iam_password_policy</a>
+                <span class="tooltiptext">Test IAM password policy meets CIS benchmarks</span>
             </div></span></td>
         </tr>
         <tr>
-            <td>IAM Roles for Service Access</td>
-            <td>Ensure IAM roles are used for AWS service access</td>
-            <td>FSBP: IAM.21; CIS AWS 3.0.0: 1.16, 1.17; AWS SSB: IAM.7</td>
+            <td>IAM Policies Attached to Groups</td>
+            <td>Ensure IAM policies are attached only to groups or roles</td>
+            <td>FSBP: IAM.16</td>
             <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_iam_roles_for_service_access" class="test-link">test_iam_roles_for_service_access</a>
-                <span class="tooltiptext">Test IAM roles for service access</span>
+                <a href="#test-test_iam_policy_governance" class="test-link">test_iam_policy_governance</a>
+                <span class="tooltiptext">Test IAM policy governance monitoring</span>
             </div></span></td>
         </tr>
         <tr>
@@ -347,131 +278,8 @@
             <td>Ensure MFA is enabled for all IAM users with console access</td>
             <td>FSBP: IAM.19; CIS AWS 3.0.0: 1.12; AWS SSB: IAM.3</td>
             <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_mfa_for_console_access" class="test-link">test_mfa_for_console_access</a>
-                <span class="tooltiptext">Test MFA for console access</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Network ACL Monitoring</td>
-            <td>Ensure network ACL changes are monitored</td>
-            <td>FSBP: EC2.21; AWS SSB: NET.5</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_network_acl_monitoring" class="test-link">test_network_acl_monitoring</a>
-                <span class="tooltiptext">Test Network ACL monitoring</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>No Root Access Key</td>
-            <td>Ensure no root account access key exists</td>
-            <td>CIS AWS 3.0.0: 1.4; AWS SSB: IAM.2</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_security_monitoring_for_root_activity" class="test-link">test_security_monitoring_for_root_activity</a>
-                <span class="tooltiptext">Test monitoring for root account activity</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Restricted RDP Access</td>
-            <td>Ensure no security groups allow ingress from 0.0.0.0/0 to port 3389</td>
-            <td>FSBP: EC2.14; CIS AWS 3.0.0: 5.2; AWS SSB: NET.8</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_restricted_rdp_access" class="test-link">test_restricted_rdp_access</a>
-                <span class="tooltiptext">Test restricted RDP access</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_restricted_ssh_access" class="test-link">test_restricted_ssh_access</a>
-                <span class="tooltiptext">Test restricted SSH access</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Restricted SSH Access</td>
-            <td>Ensure no security groups allow ingress from 0.0.0.0/0 to port 22</td>
-            <td>FSBP: EC2.13; CIS AWS 3.0.0: 5.2; AWS SSB: NET.7</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_restricted_rdp_access" class="test-link">test_restricted_rdp_access</a>
-                <span class="tooltiptext">Test restricted RDP access</span>
-            </div></span><br><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_restricted_ssh_access" class="test-link">test_restricted_ssh_access</a>
-                <span class="tooltiptext">Test restricted SSH access</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Root Activity Monitoring</td>
-            <td>Ensure root account activity is monitored</td>
-            <td>FSBP: IAM.7; CIS AWS 3.0.0: 1.7; AWS SSB: IAM.2</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_security_monitoring_for_root_activity" class="test-link">test_security_monitoring_for_root_activity</a>
-                <span class="tooltiptext">Test monitoring for root account activity</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>S3 Public Access Block</td>
-            <td>Ensure S3 buckets block public access</td>
-            <td>FSBP: S3.1, S3.4; CIS AWS 3.0.0: 2.1.1, 2.1.2, 2.1.5; AWS SSB: DAT.1, DAT.2</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_s3_security_compliance" class="test-link">test_s3_security_compliance</a>
-                <span class="tooltiptext">Test S3 security controls meet compliance requirements</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>S3 SSL Enforcement</td>
-            <td>Ensure S3 buckets enforce SSL</td>
-            <td>FSBP: S3.5; CIS AWS 3.0.0: 2.1.3; AWS SSB: DAT.3</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_s3_bucket_ssl_enforcement" class="test-link">test_s3_bucket_ssl_enforcement</a>
-                <span class="tooltiptext">Test S3 bucket SSL enforcement</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>SNS Topic Encryption</td>
-            <td>Ensure SNS topics are encrypted</td>
-            <td>FSBP: SNS.1; AWS SSB: DAT.8</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_sns_topic_encryption" class="test-link">test_sns_topic_encryption</a>
-                <span class="tooltiptext">Test SNS Topic encryption</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Security Group Monitoring</td>
-            <td>Ensure security group changes are monitored</td>
-            <td>FSBP: EC2.19; CIS AWS 3.0.0: 5.3; AWS SSB: NET.4</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_security_group_monitoring" class="test-link">test_security_group_monitoring</a>
-                <span class="tooltiptext">Test Security Group changes are monitored</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Security Hub Compliance Standards</td>
-            <td>Ensure Security Hub enables compliance standards</td>
-            <td>FSBP: SecurityHub.1; CIS AWS 3.0.0: 3.10; AWS SSB: COM.2, LOG.8</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_security_hub_compliance_standards" class="test-link">test_security_hub_compliance_standards</a>
-                <span class="tooltiptext">Test Security Hub enables compliance standards</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>Security Hub Findings Alerts</td>
-            <td>Ensure Security Hub findings are monitored and alerted</td>
-            <td>FSBP: SecurityHub.2; AWS SSB: COM.5, IR.5</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_security_hub_findings_alerts" class="test-link">test_security_hub_findings_alerts</a>
-                <span class="tooltiptext">Test Security Hub findings alerts</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>VPC Endpoints Security</td>
-            <td>Ensure VPC endpoints are configured with least privilege</td>
-            <td>FSBP: EC2.15; AWS SSB: NET.6</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_vpc_endpoints_security" class="test-link">test_vpc_endpoints_security</a>
-                <span class="tooltiptext">Test VPC endpoint security</span>
-            </div></span></td>
-        </tr>
-        <tr>
-            <td>VPC Flow Logs</td>
-            <td>Ensure VPC Flow Logs are enabled</td>
-            <td>FSBP: EC2.6; CIS AWS 3.0.0: 3.9; AWS SSB: NET.1</td>
-            <td><span class="passed">✓ <div class="tooltip">
-                <a href="#test-test_vpc_flow_logs_enabled" class="test-link">test_vpc_flow_logs_enabled</a>
-                <span class="tooltiptext">Test VPC Flow Logs are enabled</span>
+                <a href="#test-test_iam_password_policy" class="test-link">test_iam_password_policy</a>
+                <span class="tooltiptext">Test IAM password policy meets CIS benchmarks</span>
             </div></span></td>
         </tr>
     </table>
@@ -487,6 +295,20 @@
         </tr>
 
         <tr class="reason-other">
+            <td>AWS Config Enabled</td>
+            <td>Ensure AWS Config is enabled</td>
+            <td>FSBP: Config.1; CIS AWS 3.0.0: 3.5; AWS SSB: LOG.6</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>AWS Config Rules</td>
+            <td>Ensure AWS Config Rules are configured for compliance monitoring</td>
+            <td>FSBP: Config.1; CIS AWS 3.0.0: 3.5; AWS SSB: COM.1, LOG.6</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
             <td>Automated Remediation</td>
             <td>Ensure automated remediation is implemented for critical findings</td>
             <td>AWS SSB: IR.8</td>
@@ -501,9 +323,9 @@
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
         <tr class="reason-other">
-            <td>CloudTrail Log File Validation</td>
-            <td>Ensure CloudTrail log file validation is enabled</td>
-            <td>CIS AWS 3.0.0: 3.3</td>
+            <td>CloudWatch Log Group Retention</td>
+            <td>Ensure CloudWatch Log Groups have retention periods set</td>
+            <td>FSBP: CloudWatch.1; CIS AWS 3.0.0: 3.4; AWS SSB: LOG.5</td>
             <td class="reason">Not implemented</td>
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
@@ -522,6 +344,27 @@
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
         <tr class="reason-other">
+            <td>Default Security Group Restrictions</td>
+            <td>Ensure default security groups restrict all traffic</td>
+            <td>FSBP: EC2.2; CIS AWS 3.0.0: 5.4; AWS SSB: NET.2</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>EBS Encryption by Default</td>
+            <td>Ensure EBS volumes are encrypted by default</td>
+            <td>FSBP: EC2.7; CIS AWS 3.0.0: 2.2.1; AWS SSB: DAT.5</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>GuardDuty Findings Alerts</td>
+            <td>Ensure GuardDuty findings are monitored and alerted</td>
+            <td>FSBP: GuardDuty.4; AWS SSB: IR.4</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
             <td>Incident Response Exercises</td>
             <td>Ensure incident response exercises are conducted</td>
             <td>AWS SSB: IR.9</td>
@@ -536,6 +379,13 @@
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
         <tr class="reason-other">
+            <td>Network ACL Monitoring</td>
+            <td>Ensure network ACL changes are monitored</td>
+            <td>FSBP: EC2.21; AWS SSB: NET.5</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
             <td>Network Segmentation</td>
             <td>Ensure network is properly segmented</td>
             <td>AWS SSB: NET.9</td>
@@ -543,9 +393,65 @@
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
         <tr class="reason-other">
+            <td>No Root Access Key</td>
+            <td>Ensure no root account access key exists</td>
+            <td>CIS AWS 3.0.0: 1.4; AWS SSB: IAM.2</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>Restricted RDP Access</td>
+            <td>Ensure no security groups allow ingress from 0.0.0.0/0 to port 3389</td>
+            <td>FSBP: EC2.14; CIS AWS 3.0.0: 5.2; AWS SSB: NET.8</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>Restricted SSH Access</td>
+            <td>Ensure no security groups allow ingress from 0.0.0.0/0 to port 22</td>
+            <td>FSBP: EC2.13; CIS AWS 3.0.0: 5.2; AWS SSB: NET.7</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>S3 Public Access Block</td>
+            <td>Ensure S3 buckets block public access</td>
+            <td>FSBP: S3.1, S3.4; CIS AWS 3.0.0: 2.1.1, 2.1.2, 2.1.5; AWS SSB: DAT.1, DAT.2</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>S3 SSL Enforcement</td>
+            <td>Ensure S3 buckets enforce SSL</td>
+            <td>FSBP: S3.5; CIS AWS 3.0.0: 2.1.3; AWS SSB: DAT.3</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
             <td>Security Contact Information</td>
             <td>Ensure security contact information is registered</td>
             <td>CIS AWS 3.0.0: 1.18</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>Security Group Monitoring</td>
+            <td>Ensure security group changes are monitored</td>
+            <td>FSBP: EC2.19; CIS AWS 3.0.0: 5.3; AWS SSB: NET.4</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>Security Hub Findings Alerts</td>
+            <td>Ensure Security Hub findings are monitored and alerted</td>
+            <td>FSBP: SecurityHub.2; AWS SSB: COM.5, IR.5</td>
+            <td class="reason">Not implemented</td>
+            <td><a href="untested_controls.md">Documentation</a></td>
+        </tr>
+        <tr class="reason-other">
+            <td>VPC Flow Logs</td>
+            <td>Ensure VPC Flow Logs are enabled</td>
+            <td>FSBP: EC2.6; CIS AWS 3.0.0: 3.9; AWS SSB: NET.1</td>
             <td class="reason">Not implemented</td>
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
@@ -564,9 +470,23 @@
             <td><a href="untested_controls.md">Documentation</a></td>
         </tr>
         <tr class="reason-runtime">
+            <td>CloudTrail Log Encryption</td>
+            <td>Ensure CloudTrail logs are encrypted</td>
+            <td>FSBP: CloudTrail.2; CIS AWS 3.0.0: 3.5; AWS SSB: DAT.7</td>
+            <td class="reason">Runtime verification required</td>
+            <td><a href="untested_controls.md#1-runtime-dependent-controls">Documentation</a></td>
+        </tr>
+        <tr class="reason-runtime">
             <td>CloudWatch Alarms</td>
             <td>Ensure CloudWatch alarms are configured for critical metrics</td>
             <td>FSBP: CloudWatch.2; CIS AWS 3.0.0: 3.11; AWS SSB: IR.2</td>
+            <td class="reason">Runtime verification required</td>
+            <td><a href="untested_controls.md#1-runtime-dependent-controls">Documentation</a></td>
+        </tr>
+        <tr class="reason-runtime">
+            <td>GuardDuty Enabled</td>
+            <td>Ensure GuardDuty is enabled</td>
+            <td>FSBP: GuardDuty.1; CIS AWS 3.0.0: 3.8; AWS SSB: LOG.7</td>
             <td class="reason">Runtime verification required</td>
             <td><a href="untested_controls.md#1-runtime-dependent-controls">Documentation</a></td>
         </tr>
@@ -577,6 +497,13 @@
             <td class="reason">Runtime verification required</td>
             <td><a href="untested_controls.md#1-runtime-dependent-controls">Documentation</a></td>
         </tr>
+        <tr class="reason-runtime">
+            <td>Security Hub Compliance Standards</td>
+            <td>Ensure Security Hub enables compliance standards</td>
+            <td>FSBP: SecurityHub.1; CIS AWS 3.0.0: 3.10; AWS SSB: COM.2, LOG.8</td>
+            <td class="reason">Runtime verification required</td>
+            <td><a href="untested_controls.md#1-runtime-dependent-controls">Documentation</a></td>
+        </tr>
         <tr class="reason-manual">
             <td>Compliance Reporting</td>
             <td>Ensure compliance reports are generated and reviewed</td>
@@ -584,19 +511,33 @@
             <td class="reason">Manual verification required</td>
             <td><a href="untested_controls.md#5-manual-verification-required">Documentation</a></td>
         </tr>
-        <tr class="reason-residual">
-            <td>Hardware MFA for Root</td>
-            <td>Ensure hardware MFA is enabled for the root account</td>
-            <td>FSBP: IAM.4; CIS AWS 3.0.0: 1.13; AWS SSB: IAM.5</td>
-            <td class="reason">Documented residual risk</td>
-            <td><a href="untested_controls.md#2-documented-residual-risk-controls">Documentation</a></td>
+        <tr class="reason-manual">
+            <td>IAM Roles for Service Access</td>
+            <td>Ensure IAM roles are used for AWS service access</td>
+            <td>FSBP: IAM.21; CIS AWS 3.0.0: 1.16, 1.17; AWS SSB: IAM.7</td>
+            <td class="reason">Manual verification required</td>
+            <td><a href="untested_controls.md#5-manual-verification-required">Documentation</a></td>
         </tr>
-        <tr class="reason-testing">
-            <td>IAM Policies Attached to Groups</td>
-            <td>Ensure IAM policies are attached only to groups or roles</td>
-            <td>FSBP: IAM.16</td>
-            <td class="reason">Testing framework limitations</td>
-            <td><a href="untested_controls.md#4-testing-framework-limitations">Documentation</a></td>
+        <tr class="reason-manual">
+            <td>Root Activity Monitoring</td>
+            <td>Ensure root account activity is monitored</td>
+            <td>FSBP: IAM.7; CIS AWS 3.0.0: 1.7; AWS SSB: IAM.2</td>
+            <td class="reason">Manual verification required</td>
+            <td><a href="untested_controls.md#5-manual-verification-required">Documentation</a></td>
+        </tr>
+        <tr class="reason-implementation">
+            <td>SNS Topic Encryption</td>
+            <td>Ensure SNS topics are encrypted</td>
+            <td>FSBP: SNS.1; AWS SSB: DAT.8</td>
+            <td class="reason">Implementation gap</td>
+            <td><a href="untested_controls.md#3-implementation-gaps">Documentation</a></td>
+        </tr>
+        <tr class="reason-implementation">
+            <td>VPC Endpoints Security</td>
+            <td>Ensure VPC endpoints are configured with least privilege</td>
+            <td>FSBP: EC2.15; AWS SSB: NET.6</td>
+            <td class="reason">Implementation gap</td>
+            <td><a href="untested_controls.md#3-implementation-gaps">Documentation</a></td>
         </tr>
     </table>
     
@@ -625,206 +566,59 @@
     <h2>Test Implementation Details</h2>
     <p>This section provides details on how each test validates compliance controls.</p>
     
-    <div class="test-details" id="test-test_iam_password_policy_compliance">
-        <h3>test_iam_password_policy_compliance</h3>
+    <div class="test-details" id="test-test_iam_password_policy">
+        <h3>test_iam_password_policy</h3>
         <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test IAM password policy meets CIS AWS 3.0.0 requirements</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.9, CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11, AWS SSB: IAM.1</p>
-        <p><strong>Controls Covered:</strong> IAM Password Policy</p>
+        <p><strong>Description:</strong> Test IAM password policy meets CIS benchmarks</p>
+        <p><strong>Framework References:</strong> CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14</p>
+        <p><strong>Controls Covered:</strong> Access Keys Rotated, Hardware MFA for Root, IAM Password Policy, MFA for Console Access</p>
         <p><strong>Implementation:</strong></p>
         <pre>
-# Test implementation for test_iam_password_policy_compliance
-# This test validates the following controls: IAM Password Policy
-# Framework references: FSBP: IAM.9, CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11, AWS SSB: IAM.1
+# Test implementation for test_iam_password_policy
+# This test validates the following controls: Access Keys Rotated, Hardware MFA for Root, IAM Password Policy, MFA for Console Access
+# Framework references: CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14
 
-def test_iam_password_policy_compliance(self):
+def test_iam_password_policy(self):
     """
-    Test IAM password policy meets CIS AWS 3.0.0 requirements
+    Test IAM password policy meets CIS benchmarks
     """
     # Test implementation details can be found in tests/test_compliance.py
         </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
+        <p><a href="https://github.com/kalleeh/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
     </div>
     
-    <div class="test-details" id="test-test_s3_security_compliance">
-        <h3>test_s3_security_compliance</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test S3 security controls meet compliance requirements</p>
-        <p><strong>Framework References:</strong> FSBP: S3.1, S3.4, CIS AWS 3.0.0: 2.1.1, 2.1.2, 2.1.5, AWS SSB: DAT.1, DAT.2</p>
-        <p><strong>Controls Covered:</strong> S3 Public Access Block</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_s3_security_compliance
-# This test validates the following controls: S3 Public Access Block
-# Framework references: FSBP: S3.1, S3.4, CIS AWS 3.0.0: 2.1.1, 2.1.2, 2.1.5, AWS SSB: DAT.1, DAT.2
-
-def test_s3_security_compliance(self):
-    """
-    Test S3 security controls meet compliance requirements
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_security_hub_compliance_standards">
-        <h3>test_security_hub_compliance_standards</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test Security Hub enables compliance standards</p>
-        <p><strong>Framework References:</strong> FSBP: SecurityHub.1, CIS AWS 3.0.0: 3.10, AWS SSB: COM.2, LOG.8</p>
-        <p><strong>Controls Covered:</strong> Security Hub Compliance Standards</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_security_hub_compliance_standards
-# This test validates the following controls: Security Hub Compliance Standards
-# Framework references: FSBP: SecurityHub.1, CIS AWS 3.0.0: 3.10, AWS SSB: COM.2, LOG.8
-
-def test_security_hub_compliance_standards(self):
-    """
-    Test Security Hub enables compliance standards
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_guardduty_enabled">
-        <h3>test_guardduty_enabled</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test GuardDuty is enabled</p>
-        <p><strong>Framework References:</strong> FSBP: GuardDuty.1, CIS AWS 3.0.0: 3.8, AWS SSB: LOG.7</p>
-        <p><strong>Controls Covered:</strong> GuardDuty Enabled</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_guardduty_enabled
-# This test validates the following controls: GuardDuty Enabled
-# Framework references: FSBP: GuardDuty.1, CIS AWS 3.0.0: 3.8, AWS SSB: LOG.7
-
-def test_guardduty_enabled(self):
-    """
-    Test GuardDuty is enabled
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_security_monitoring_for_root_activity">
-        <h3>test_security_monitoring_for_root_activity</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test monitoring for root account activity</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.7, CIS AWS 3.0.0: 1.7, AWS SSB: IAM.2</p>
-        <p><strong>Controls Covered:</strong> No Root Access Key, Root Activity Monitoring</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_security_monitoring_for_root_activity
-# This test validates the following controls: No Root Access Key, Root Activity Monitoring
-# Framework references: FSBP: IAM.7, CIS AWS 3.0.0: 1.7, AWS SSB: IAM.2
-
-def test_security_monitoring_for_root_activity(self):
-    """
-    Test monitoring for root account activity
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_config_rules_for_compliance">
-        <h3>test_config_rules_for_compliance</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test AWS Config Rules for compliance monitoring</p>
-        <p><strong>Framework References:</strong> FSBP: Config.1, CIS AWS 3.0.0: 3.5, AWS SSB: COM.1, LOG.6</p>
-        <p><strong>Controls Covered:</strong> AWS Config Enabled, AWS Config Rules, CloudTrail Log Encryption</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_config_rules_for_compliance
-# This test validates the following controls: AWS Config Enabled, AWS Config Rules, CloudTrail Log Encryption
-# Framework references: FSBP: Config.1, CIS AWS 3.0.0: 3.5, AWS SSB: COM.1, LOG.6
-
-def test_config_rules_for_compliance(self):
-    """
-    Test AWS Config Rules for compliance monitoring
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_vpc_flow_logs_enabled">
-        <h3>test_vpc_flow_logs_enabled</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test VPC Flow Logs are enabled</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.6, CIS AWS 3.0.0: 3.9, AWS SSB: NET.1</p>
-        <p><strong>Controls Covered:</strong> VPC Flow Logs</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_vpc_flow_logs_enabled
-# This test validates the following controls: VPC Flow Logs
-# Framework references: FSBP: EC2.6, CIS AWS 3.0.0: 3.9, AWS SSB: NET.1
-
-def test_vpc_flow_logs_enabled(self):
-    """
-    Test VPC Flow Logs are enabled
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_security_group_monitoring">
-        <h3>test_security_group_monitoring</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test Security Group changes are monitored</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.19, CIS AWS 3.0.0: 5.3, AWS SSB: NET.4</p>
-        <p><strong>Controls Covered:</strong> Security Group Monitoring</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_security_group_monitoring
-# This test validates the following controls: Security Group Monitoring
-# Framework references: FSBP: EC2.19, CIS AWS 3.0.0: 5.3, AWS SSB: NET.4
-
-def test_security_group_monitoring(self):
-    """
-    Test Security Group changes are monitored
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_iam_access_analyzer_enabled">
-        <h3>test_iam_access_analyzer_enabled</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
+    <div class="test-details" id="test-test_iam_access_analyzer">
+        <h3>test_iam_access_analyzer</h3>
+        <p><strong>Status:</strong> <span class="failed">Failed</span></p>
         <p><strong>Description:</strong> Test IAM Access Analyzer is enabled</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.8, CIS AWS 3.0.0: 1.20, AWS SSB: IAM.6</p>
+        <p><strong>Framework References:</strong> FSBP: IAM.8, CIS AWS 3.0.0: 1.20, AWS SSB: IR.6</p>
         <p><strong>Controls Covered:</strong> IAM Access Analyzer, IAM Access Analyzer Alerts</p>
         <p><strong>Implementation:</strong></p>
         <pre>
-# Test implementation for test_iam_access_analyzer_enabled
+# Test implementation for test_iam_access_analyzer
 # This test validates the following controls: IAM Access Analyzer, IAM Access Analyzer Alerts
-# Framework references: FSBP: IAM.8, CIS AWS 3.0.0: 1.20, AWS SSB: IAM.6
+# Framework references: FSBP: IAM.8, CIS AWS 3.0.0: 1.20, AWS SSB: IR.6
 
-def test_iam_access_analyzer_enabled(self):
+def test_iam_access_analyzer(self):
     """
     Test IAM Access Analyzer is enabled
     """
     # Test implementation details can be found in tests/test_compliance.py
         </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
+        <p><a href="https://github.com/kalleeh/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
     </div>
     
     <div class="test-details" id="test-test_cloudtrail_enabled_and_configured">
         <h3>test_cloudtrail_enabled_and_configured</h3>
         <p><strong>Status:</strong> <span class="passed">Passed</span></p>
         <p><strong>Description:</strong> Test CloudTrail is enabled and properly configured</p>
-        <p><strong>Framework References:</strong> FSBP: CloudTrail.1, CloudTrail.4, CloudTrail.5, CIS AWS 3.0.0: 3.1, 3.2, AWS SSB: LOG.1, LOG.2, LOG.4</p>
-        <p><strong>Controls Covered:</strong> CloudTrail Configuration</p>
+        <p><strong>Framework References:</strong> FSBP: CloudTrail.1, CloudTrail.4, CloudTrail.5, CIS AWS 3.0.0: 3.1, 3.2, 3.3, AWS SSB: LOG.1, LOG.2, LOG.4</p>
+        <p><strong>Controls Covered:</strong> CloudTrail Configuration, CloudTrail Log File Validation</p>
         <p><strong>Implementation:</strong></p>
         <pre>
 # Test implementation for test_cloudtrail_enabled_and_configured
-# This test validates the following controls: CloudTrail Configuration
-# Framework references: FSBP: CloudTrail.1, CloudTrail.4, CloudTrail.5, CIS AWS 3.0.0: 3.1, 3.2, AWS SSB: LOG.1, LOG.2, LOG.4
+# This test validates the following controls: CloudTrail Configuration, CloudTrail Log File Validation
+# Framework references: FSBP: CloudTrail.1, CloudTrail.4, CloudTrail.5, CIS AWS 3.0.0: 3.1, 3.2, 3.3, AWS SSB: LOG.1, LOG.2, LOG.4
 
 def test_cloudtrail_enabled_and_configured(self):
     """
@@ -832,7 +626,7 @@ def test_cloudtrail_enabled_and_configured(self):
     """
     # Test implementation details can be found in tests/test_compliance.py
         </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
+        <p><a href="https://github.com/kalleeh/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
     </div>
     
     <div class="test-details" id="test-test_kms_key_rotation">
@@ -853,343 +647,28 @@ def test_kms_key_rotation(self):
     """
     # Test implementation details can be found in tests/test_compliance.py
         </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
+        <p><a href="https://github.com/kalleeh/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
     </div>
     
-    <div class="test-details" id="test-test_default_security_group_restrictions">
-        <h3>test_default_security_group_restrictions</h3>
+    <div class="test-details" id="test-test_iam_policy_governance">
+        <h3>test_iam_policy_governance</h3>
         <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test default security groups are restricted</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.2, CIS AWS 3.0.0: 5.4, AWS SSB: NET.2</p>
-        <p><strong>Controls Covered:</strong> Default Security Group Restrictions</p>
+        <p><strong>Description:</strong> Test IAM policy governance monitoring</p>
+        <p><strong>Framework References:</strong> FSBP: IAM.16</p>
+        <p><strong>Controls Covered:</strong> IAM Policies Attached to Groups</p>
         <p><strong>Implementation:</strong></p>
         <pre>
-# Test implementation for test_default_security_group_restrictions
-# This test validates the following controls: Default Security Group Restrictions
-# Framework references: FSBP: EC2.2, CIS AWS 3.0.0: 5.4, AWS SSB: NET.2
+# Test implementation for test_iam_policy_governance
+# This test validates the following controls: IAM Policies Attached to Groups
+# Framework references: FSBP: IAM.16
 
-def test_default_security_group_restrictions(self):
+def test_iam_policy_governance(self):
     """
-    Test default security groups are restricted
+    Test IAM policy governance monitoring
     """
     # Test implementation details can be found in tests/test_compliance.py
         </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_s3_bucket_ssl_enforcement">
-        <h3>test_s3_bucket_ssl_enforcement</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test S3 bucket SSL enforcement</p>
-        <p><strong>Framework References:</strong> FSBP: S3.5, CIS AWS 3.0.0: 2.1.3, AWS SSB: DAT.3</p>
-        <p><strong>Controls Covered:</strong> S3 SSL Enforcement</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_s3_bucket_ssl_enforcement
-# This test validates the following controls: S3 SSL Enforcement
-# Framework references: FSBP: S3.5, CIS AWS 3.0.0: 2.1.3, AWS SSB: DAT.3
-
-def test_s3_bucket_ssl_enforcement(self):
-    """
-    Test S3 bucket SSL enforcement
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_aws_config_enabled">
-        <h3>test_aws_config_enabled</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test AWS Config is enabled</p>
-        <p><strong>Framework References:</strong> FSBP: Config.1, CIS AWS 3.0.0: 3.5, AWS SSB: LOG.6</p>
-        <p><strong>Controls Covered:</strong> AWS Config Enabled, AWS Config Rules, CloudTrail Log Encryption</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_aws_config_enabled
-# This test validates the following controls: AWS Config Enabled, AWS Config Rules, CloudTrail Log Encryption
-# Framework references: FSBP: Config.1, CIS AWS 3.0.0: 3.5, AWS SSB: LOG.6
-
-def test_aws_config_enabled(self):
-    """
-    Test AWS Config is enabled
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_cloudwatch_log_group_retention">
-        <h3>test_cloudwatch_log_group_retention</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test CloudWatch Log Group retention</p>
-        <p><strong>Framework References:</strong> FSBP: CloudWatch.1, CIS AWS 3.0.0: 3.4, AWS SSB: LOG.5</p>
-        <p><strong>Controls Covered:</strong> CloudWatch Log Group Retention</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_cloudwatch_log_group_retention
-# This test validates the following controls: CloudWatch Log Group Retention
-# Framework references: FSBP: CloudWatch.1, CIS AWS 3.0.0: 3.4, AWS SSB: LOG.5
-
-def test_cloudwatch_log_group_retention(self):
-    """
-    Test CloudWatch Log Group retention
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_network_acl_monitoring">
-        <h3>test_network_acl_monitoring</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test Network ACL monitoring</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.21, AWS SSB: NET.5</p>
-        <p><strong>Controls Covered:</strong> Network ACL Monitoring</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_network_acl_monitoring
-# This test validates the following controls: Network ACL Monitoring
-# Framework references: FSBP: EC2.21, AWS SSB: NET.5
-
-def test_network_acl_monitoring(self):
-    """
-    Test Network ACL monitoring
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_sns_topic_encryption">
-        <h3>test_sns_topic_encryption</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test SNS Topic encryption</p>
-        <p><strong>Framework References:</strong> FSBP: SNS.1, AWS SSB: DAT.8</p>
-        <p><strong>Controls Covered:</strong> SNS Topic Encryption</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_sns_topic_encryption
-# This test validates the following controls: SNS Topic Encryption
-# Framework references: FSBP: SNS.1, AWS SSB: DAT.8
-
-def test_sns_topic_encryption(self):
-    """
-    Test SNS Topic encryption
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_ebs_encryption_by_default">
-        <h3>test_ebs_encryption_by_default</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test EBS encryption by default</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.7, CIS AWS 3.0.0: 2.2.1, AWS SSB: DAT.5</p>
-        <p><strong>Controls Covered:</strong> EBS Encryption by Default</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_ebs_encryption_by_default
-# This test validates the following controls: EBS Encryption by Default
-# Framework references: FSBP: EC2.7, CIS AWS 3.0.0: 2.2.1, AWS SSB: DAT.5
-
-def test_ebs_encryption_by_default(self):
-    """
-    Test EBS encryption by default
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_iam_roles_for_service_access">
-        <h3>test_iam_roles_for_service_access</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test IAM roles for service access</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.21, CIS AWS 3.0.0: 1.16, 1.17, AWS SSB: IAM.7</p>
-        <p><strong>Controls Covered:</strong> IAM Roles for Service Access</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_iam_roles_for_service_access
-# This test validates the following controls: IAM Roles for Service Access
-# Framework references: FSBP: IAM.21, CIS AWS 3.0.0: 1.16, 1.17, AWS SSB: IAM.7
-
-def test_iam_roles_for_service_access(self):
-    """
-    Test IAM roles for service access
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_restricted_ssh_access">
-        <h3>test_restricted_ssh_access</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test restricted SSH access</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.13, CIS AWS 3.0.0: 5.2, AWS SSB: NET.7</p>
-        <p><strong>Controls Covered:</strong> Restricted RDP Access, Restricted SSH Access</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_restricted_ssh_access
-# This test validates the following controls: Restricted RDP Access, Restricted SSH Access
-# Framework references: FSBP: EC2.13, CIS AWS 3.0.0: 5.2, AWS SSB: NET.7
-
-def test_restricted_ssh_access(self):
-    """
-    Test restricted SSH access
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_restricted_rdp_access">
-        <h3>test_restricted_rdp_access</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test restricted RDP access</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.14, CIS AWS 3.0.0: 5.2, AWS SSB: NET.8</p>
-        <p><strong>Controls Covered:</strong> Restricted RDP Access, Restricted SSH Access</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_restricted_rdp_access
-# This test validates the following controls: Restricted RDP Access, Restricted SSH Access
-# Framework references: FSBP: EC2.14, CIS AWS 3.0.0: 5.2, AWS SSB: NET.8
-
-def test_restricted_rdp_access(self):
-    """
-    Test restricted RDP access
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_access_keys_rotated">
-        <h3>test_access_keys_rotated</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test access keys rotation monitoring</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.3, CIS AWS 3.0.0: 1.14, AWS SSB: IAM.4</p>
-        <p><strong>Controls Covered:</strong> Access Keys Rotated</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_access_keys_rotated
-# This test validates the following controls: Access Keys Rotated
-# Framework references: FSBP: IAM.3, CIS AWS 3.0.0: 1.14, AWS SSB: IAM.4
-
-def test_access_keys_rotated(self):
-    """
-    Test access keys rotation monitoring
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_mfa_for_console_access">
-        <h3>test_mfa_for_console_access</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test MFA for console access</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.19, CIS AWS 3.0.0: 1.12, AWS SSB: IAM.3</p>
-        <p><strong>Controls Covered:</strong> MFA for Console Access</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_mfa_for_console_access
-# This test validates the following controls: MFA for Console Access
-# Framework references: FSBP: IAM.19, CIS AWS 3.0.0: 1.12, AWS SSB: IAM.3
-
-def test_mfa_for_console_access(self):
-    """
-    Test MFA for console access
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_vpc_endpoints_security">
-        <h3>test_vpc_endpoints_security</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test VPC endpoint security</p>
-        <p><strong>Framework References:</strong> FSBP: EC2.15, AWS SSB: NET.6</p>
-        <p><strong>Controls Covered:</strong> VPC Endpoints Security</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_vpc_endpoints_security
-# This test validates the following controls: VPC Endpoints Security
-# Framework references: FSBP: EC2.15, AWS SSB: NET.6
-
-def test_vpc_endpoints_security(self):
-    """
-    Test VPC endpoint security
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_security_hub_findings_alerts">
-        <h3>test_security_hub_findings_alerts</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test Security Hub findings alerts</p>
-        <p><strong>Framework References:</strong> FSBP: SecurityHub.2, AWS SSB: COM.5, IR.5</p>
-        <p><strong>Controls Covered:</strong> Security Hub Findings Alerts</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_security_hub_findings_alerts
-# This test validates the following controls: Security Hub Findings Alerts
-# Framework references: FSBP: SecurityHub.2, AWS SSB: COM.5, IR.5
-
-def test_security_hub_findings_alerts(self):
-    """
-    Test Security Hub findings alerts
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_guardduty_findings_alerts">
-        <h3>test_guardduty_findings_alerts</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test GuardDuty findings alerts</p>
-        <p><strong>Framework References:</strong> FSBP: GuardDuty.4, AWS SSB: IR.4</p>
-        <p><strong>Controls Covered:</strong> GuardDuty Findings Alerts</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_guardduty_findings_alerts
-# This test validates the following controls: GuardDuty Findings Alerts
-# Framework references: FSBP: GuardDuty.4, AWS SSB: IR.4
-
-def test_guardduty_findings_alerts(self):
-    """
-    Test GuardDuty findings alerts
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
-    </div>
-    
-    <div class="test-details" id="test-test_iam_access_analyzer_alerts">
-        <h3>test_iam_access_analyzer_alerts</h3>
-        <p><strong>Status:</strong> <span class="passed">Passed</span></p>
-        <p><strong>Description:</strong> Test IAM Access Analyzer alerts</p>
-        <p><strong>Framework References:</strong> FSBP: IAM.8, AWS SSB: IR.6</p>
-        <p><strong>Controls Covered:</strong> IAM Access Analyzer, IAM Access Analyzer Alerts</p>
-        <p><strong>Implementation:</strong></p>
-        <pre>
-# Test implementation for test_iam_access_analyzer_alerts
-# This test validates the following controls: IAM Access Analyzer, IAM Access Analyzer Alerts
-# Framework references: FSBP: IAM.8, AWS SSB: IR.6
-
-def test_iam_access_analyzer_alerts(self):
-    """
-    Test IAM Access Analyzer alerts
-    """
-    # Test implementation details can be found in tests/test_compliance.py
-        </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
+        <p><a href="https://github.com/kalleeh/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
     </div>
     
     <div class="footer">

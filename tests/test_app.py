@@ -83,8 +83,8 @@ def test_vpc_stack_creates_vpc_with_endpoints():
         "EnableDnsSupport": True
     })
     
-    # Verify Security Groups
-    template.resource_count_is("AWS::EC2::SecurityGroup", 2)  # Bastion and Application SGs
+    # Verify Security Groups - there are 3 SGs: Bastion, Application, and VPC Endpoint SGs
+    template.resource_count_is("AWS::EC2::SecurityGroup", 3)
 
 def test_network_security_stack_creates_flow_logs_resources():
     # GIVEN
