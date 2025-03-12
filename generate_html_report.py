@@ -547,7 +547,7 @@ def {test_name}(self):
     \"\"\"
     # Test implementation details can be found in tests/test_compliance.py
         </pre>
-        <p><a href="https://github.com/your-org/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
+        <p><a href="https://github.com/kalleeh/aws-msb-cdk/blob/main/tests/test_compliance.py" target="_blank">View full test implementation on GitHub</a></p>
     </div>
     """
     
