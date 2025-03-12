@@ -113,10 +113,12 @@ class TestComplianceMatrix:
     
     def test_guardduty_enabled(self):
         """
-        Test GuardDuty is enabled
+        Test GuardDuty is enabled with enhanced configuration
         - FSBP: GuardDuty.1
         - CIS AWS 3.0.0: 3.8
         - AWS SSB: LOG.7
+        - PCI DSS v3.2.1/11.4, PCI DSS v4.0.1/11.5.1
+        - NIST.800-53.r5 SI-4, NIST.800-53.r5 SI-4(1), NIST.800-53.r5 SI-4(2)
         """
         # GIVEN
         app = cdk.App()
@@ -126,9 +128,28 @@ class TestComplianceMatrix:
         template = Template.from_stack(stack)
         
         # THEN
-        # Verify GuardDuty Detector is enabled
+        # Verify GuardDuty Detector is enabled with enhanced configuration
         template.has_resource_properties("AWS::GuardDuty::Detector", {
-            "Enable": True
+            "Enable": True,
+            "FindingPublishingFrequency": "FIFTEEN_MINUTES",
+            "DataSources": {
+                "S3Logs": {
+                    "Enable": True
+                }
+            }
+        })
+        
+        # Verify S3 bucket for findings is properly configured
+        template.has_resource_properties("AWS::S3::Bucket", {
+            "VersioningConfiguration": {
+                "Status": "Enabled"
+            },
+            "PublicAccessBlockConfiguration": {
+                "BlockPublicAcls": True,
+                "BlockPublicPolicy": True,
+                "IgnorePublicAcls": True,
+                "RestrictPublicBuckets": True
+            }
         })
     
     def test_security_monitoring_for_root_activity(self):
