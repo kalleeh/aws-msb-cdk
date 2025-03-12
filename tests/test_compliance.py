@@ -750,6 +750,45 @@ class TestComplianceMatrix:
             }
         })
         
+    def test_cloudwatch_alarms_for_unauthorized_api_calls(self):
+        """
+        Test CloudWatch alarms for unauthorized API calls
+        - FSBP: CloudWatch.2
+        - CIS AWS Foundations Benchmark v1.2.0/3.1
+        """
+        # GIVEN
+        app = cdk.App()
+        
+        # WHEN
+        logging_stack = LoggingStack(app, "TestLoggingStack")
+        template = Template.from_stack(logging_stack)
+        
+        # THEN
+        # Verify metric filter for unauthorized API calls
+        template.has_resource_properties("AWS::Logs::MetricFilter", {
+            "FilterPattern": '{($.errorCode="*UnauthorizedOperation") || ($.errorCode="AccessDenied*")}',
+            "MetricTransformations": [
+                {
+                    "MetricNamespace": "LogMetrics",
+                    "MetricName": "UnauthorizedAPICalls",
+                    "DefaultValue": 0,
+                    "MetricValue": "1"
+                }
+            ]
+        })
+        
+        # Verify CloudWatch alarm for unauthorized API calls
+        template.has_resource_properties("AWS::CloudWatch::Alarm", {
+            "MetricName": "UnauthorizedAPICalls",
+            "Namespace": "LogMetrics",
+            "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+            "EvaluationPeriods": 1,
+            "Period": 300,
+            "Statistic": "Sum",
+            "Threshold": 1,
+            "TreatMissingData": "notBreaching"
+        })
+        
     def test_iam_access_analyzer_alerts(self):
         """
         Test IAM Access Analyzer alerts

@@ -10,7 +10,6 @@ These controls can only be verified at runtime after deployment, not during CDK 
 |------------|-------------|---------------------|--------|
 | SecurityHub.1 | Security Hub enabled | FSBP, CIS 3.10, LOG.8 | While we test resource creation, integration functionality requires runtime verification |
 | IAM.8 | IAM Access Analyzer findings | FSBP, CIS 1.20, IR.6 | Finding generation and alerting requires runtime verification |
-| CloudWatch.2 | CloudWatch alarms | FSBP, CIS 3.11, IR.2 | Alarm triggering requires runtime verification |
 
 ## 2. Documented Residual Risk Controls
 

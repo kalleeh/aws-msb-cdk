@@ -7,6 +7,9 @@ from aws_cdk import (
     aws_sns as sns,
     aws_sns_subscriptions as sns_subs,
     aws_kms as kms,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cloudwatch_actions,
+    aws_logs_destinations as logs_destinations,
     RemovalPolicy,
     Duration,
 )
@@ -118,6 +121,43 @@ class LoggingStack(Stack):
             )
         ])
         
+        # Get the CloudWatch Logs group created by CloudTrail
+        # CloudTrail automatically creates a log group with the name /aws/cloudtrail/trail-name
+        cloudtrail_log_group = logs.LogGroup.from_log_group_name(
+            self, "CloudTrailLogGroup", 
+            log_group_name="/aws/cloudtrail/msb-cloudtrail"
+        )
+        
+        # Create metric filters and alarms for CloudTrail logs
+        
+        # 1. Unauthorized API calls metric filter and alarm (CloudWatch.2)
+        unauthorized_api_metric = logs.MetricFilter(self, "UnauthorizedAPICallsMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.errorCode="*UnauthorizedOperation") || ($.errorCode="AccessDenied*")}'),
+            metric_namespace="LogMetrics",
+            metric_name="UnauthorizedAPICalls",
+            default_value=0,
+            metric_value="1"
+        )
+        
+        unauthorized_api_alarm = cloudwatch.Alarm(self, "UnauthorizedAPICallsAlarm",
+            metric=unauthorized_api_metric.metric(
+                statistic="Sum",
+                period=Duration.minutes(5)
+            ),
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            evaluation_periods=1,
+            alarm_name="MSB-UnauthorizedAPICalls",
+            alarm_description="Alarm for unauthorized API calls that could indicate malicious activity",
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING
+        )
+        
+        # Add SNS action to the alarm
+        unauthorized_api_alarm.add_alarm_action(
+            cloudwatch_actions.SnsAction(notifications_topic)
+        )
+        
         # AWS Config Role using L2 construct
         config_role = iam.Role(self, "ConfigRole",
             role_name=f"msb-config-role-{self.region}",
@@ -161,3 +201,4 @@ class LoggingStack(Stack):
         self.notifications_topic = notifications_topic
         self.config_role = config_role
         self.cloudtrail_key = cloudtrail_key
+        self.cloudtrail_log_group = cloudtrail_log_group
