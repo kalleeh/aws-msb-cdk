@@ -10,6 +10,7 @@ These controls can only be verified at runtime after deployment, not during CDK 
 |------------|-------------|---------------------|--------|
 | SecurityHub.1 | Security Hub enabled | FSBP, CIS 3.10, LOG.8 | While we test resource creation, integration functionality requires runtime verification |
 | IAM.8 | IAM Access Analyzer findings | FSBP, CIS 1.20, IR.6 | Finding generation and alerting requires runtime verification |
+| CIS 4.1-4.16 | Various monitoring controls | CIS 3.0.0 | Requires runtime verification of event patterns and alerting |
 
 ## 2. Documented Residual Risk Controls
 
@@ -39,17 +40,15 @@ These controls are partially implemented but have gaps that prevent complete tes
 | SSB.NET.9 | Network segmentation | AWS SSB | Basic network segmentation is implemented but may not meet all requirements |
 | EC2.15 | VPC endpoint security | FSBP, NET.6 | VPC endpoints are not fully implemented in the current stack |
 | IAM.8 | IAM Access Analyzer alerts | FSBP, IR.6 | Access Analyzer is enabled but alerts are not fully implemented |
+| IAM.16 | IAM policies attached only to groups or roles | FSBP | Implementation exists but needs to be integrated into the main stack |
 
-## 4. Testing Framework Limitations
+## 4. Out of Scope Controls
 
-These controls are difficult to test due to limitations in the testing framework:
+These controls are outside the scope of what the MSB implements:
 
-| Control ID | Description | Framework Reference | Testing Challenge |
+| Control ID | Description | Framework Reference | Scope Limitation |
 |------------|-------------|---------------------|------------------|
-| CIS 3.3 | CloudTrail log file validation | CIS 3.0.0 | Difficult to verify validation effectiveness in tests |
-| CIS 5.5 | VPC peering routing tables | CIS 3.0.0 | Complex to test peering configurations |
-| IAM.16 | IAM policies attached only to groups or roles | FSBP | Requires complex policy analysis |
-| CIS 4.1-4.16 | Various monitoring controls | CIS 3.0.0 | Requires complex event pattern testing |
+| CIS 5.5 | VPC peering routing tables | CIS 3.0.0 | MSB creates secure VPCs but doesn't manage peering connections |
 
 ## 5. Manual Verification Required
 

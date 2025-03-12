@@ -1,127 +1,97 @@
 # Compliance Testing Framework
 
-This document explains the compliance testing framework used in the AWS MSB CDK project to verify alignment with security standards and frameworks.
+This document describes the testing framework used to validate compliance controls in the AWS MSB CDK implementation.
 
 ## Overview
 
-The compliance testing framework provides a structured approach to verify that the implemented security controls align with industry standards and AWS security frameworks. It maps tests to specific controls and provides evidence of compliance.
+The compliance testing framework uses AWS CDK's built-in testing capabilities to verify that resources are created with the correct properties and configurations to meet compliance requirements. The framework focuses on validating the following aspects:
 
-## Supported Compliance Frameworks
+1. **Resource Creation**: Verifying that required resources are created
+2. **Resource Configuration**: Verifying that resources have the correct properties
+3. **Resource Relationships**: Verifying that resources are properly connected
+4. **Policy Validation**: Verifying that IAM policies have the correct permissions
 
-The testing framework supports the following compliance frameworks:
+## Testing Approach
 
-1. **AWS Foundational Security Best Practices (FSBP)** - AWS security best practices for foundational security
-2. **CIS AWS Foundations Benchmark v3.0.0** - Center for Internet Security benchmarks for AWS
-3. **AWS Startup Security Baseline (SSB)** - AWS security baseline for startups
+### Synthesis Testing
 
-## Test Structure
+Most compliance controls are tested using CDK's synthesis testing capabilities. This approach validates that the CDK code generates CloudFormation templates with the correct resources and properties. The `aws-cdk-lib/assertions` module provides the `Template` class, which allows us to make assertions about the synthesized CloudFormation template.
 
-Each compliance test is structured to:
-
-1. Verify a specific security control implementation
-2. Document which compliance frameworks and controls it validates
-3. Provide evidence of compliance through assertions
-
-Example test:
+Example:
 
 ```python
-def test_iam_password_policy_compliance(self):
-    """
-    Test IAM password policy meets CIS AWS 3.0.0 requirements
-    - FSBP: IAM.9
-    - CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11
-    - AWS SSB: IAM.1
-    """
+def test_cloudtrail_enabled_and_configured(self):
     # GIVEN
     app = cdk.App()
     
     # WHEN
-    stack = IAMStack(app, "TestIAMStack")
+    stack = LoggingStack(app, "TestLoggingStack")
     template = Template.from_stack(stack)
     
     # THEN
-    template.has_resource_properties("AWS::IAM::AccountPasswordPolicy", {
-        "MinimumPasswordLength": 14,  # CIS 1.8 requires minimum length of 14
-        "RequireUppercaseCharacters": True,  # CIS 1.11
-        "RequireLowercaseCharacters": True,  # CIS 1.12
-        "RequireSymbols": True,  # CIS 1.13
-        "RequireNumbers": True,  # CIS 1.14
-        "MaxPasswordAge": 90,  # CIS 1.10 requires 90 days or less
-        "PasswordReusePrevention": 24,  # CIS 1.9 requires 24 or greater
-        "AllowUsersToChangePassword": True  # Best practice
+    # Verify CloudTrail is enabled with proper configuration
+    template.has_resource_properties("AWS::CloudTrail::Trail", {
+        "IsLogging": True,
+        "IsMultiRegionTrail": True,
+        "EnableLogFileValidation": True,
+        "IncludeGlobalServiceEvents": True
     })
 ```
 
-## Compliance Report Generation
+### Runtime Testing
 
-The framework includes a report generator that:
+Some controls require runtime verification after deployment. These controls are documented in the [Untested Controls](untested_controls.md) document. For these controls, we recommend implementing integration tests that deploy resources and verify runtime behavior.
 
-1. Parses test files to extract compliance annotations
-2. Maps tests to controls in the compliance matrix
-3. Calculates coverage metrics
-4. Generates reports in multiple formats (HTML, Markdown, CSV)
+## Test Organization
 
-### Running the Compliance Tests and Reports
+Tests are organized by compliance control category:
 
-To run the compliance tests and generate reports:
+1. **IAM Controls**: Tests for IAM-related controls
+2. **Logging Controls**: Tests for CloudTrail, CloudWatch, and other logging controls
+3. **Data Protection Controls**: Tests for encryption and data protection controls
+4. **Network Security Controls**: Tests for VPC, security groups, and other network controls
+5. **Monitoring Controls**: Tests for monitoring and alerting controls
+
+## Custom Assertions
+
+For complex controls, we've developed custom assertions to simplify testing:
+
+1. **Policy Assertions**: Validate IAM policy statements
+2. **Encryption Assertions**: Validate encryption configurations
+3. **Logging Assertions**: Validate logging configurations
+
+## Running Tests
+
+To run the compliance tests:
 
 ```bash
-./tests/run_compliance_tests.sh
+pytest tests/test_compliance.py -v
 ```
 
-This script:
-1. Runs all compliance-specific tests
-2. Generates HTML, Markdown, and CSV compliance reports
-3. Shows coverage metrics for security controls
+## Improving Test Coverage
 
-### Report Formats
+To improve test coverage for untested controls:
 
-The framework generates reports in three formats:
+1. **Runtime Testing**: Implement integration tests that deploy resources and verify runtime behavior
+2. **Custom Assertions**: Develop specialized assertions for complex controls
+3. **Manual Verification Procedures**: Document manual verification procedures for controls that cannot be automatically tested
 
-1. **HTML Report** - Interactive report with detailed coverage information
-2. **Markdown Report** - Documentation-friendly report for inclusion in project docs
-3. **CSV Report** - Data-friendly format for further analysis or import into spreadsheets
+## Recent Improvements
 
-### Report Content
+### IAM.16 Testing
 
-Each report includes:
+We've added testing for IAM.16 (IAM policies attached only to groups or roles) by implementing a Lambda function that monitors and reports on IAM policies attached directly to users. The test verifies that:
 
-1. **Overall Coverage Metrics** - Percentage of controls covered by tests
-2. **Covered Controls** - List of controls with test coverage, grouped by category
-3. **Uncovered Controls** - List of controls without test coverage
-4. **Test Details** - List of tests with their compliance mappings
+1. The Lambda function is created with the correct configuration
+2. EventBridge rules are set up to trigger the Lambda on a schedule and on policy attachment events
+3. The Lambda has the necessary permissions to check IAM policies and send notifications
 
-## Extending the Framework
+### CloudTrail Log File Validation (CIS 3.3)
 
-To add new compliance tests:
-
-1. Create a test function in `tests/test_compliance.py`
-2. Add compliance annotations in the docstring using the format:
-   ```
-   - FSBP: [control-id]
-   - CIS AWS 3.0.0: [control-id]
-   - AWS SSB: [control-id]
-   ```
-3. Implement assertions that verify the control implementation
-
-## Compliance Matrix
-
-The compliance matrix in `docs/compliance_matrix.md` serves as the source of truth for mapping MSB controls to compliance frameworks. The testing framework uses this matrix to calculate coverage metrics.
-
-## Benefits
-
-This compliance testing framework provides several benefits:
-
-1. **Evidence of Compliance** - Provides evidence that security controls are implemented correctly
-2. **Coverage Metrics** - Shows how well the implementation covers compliance requirements
-3. **Documentation** - Generates documentation that can be used for audits
-4. **Traceability** - Maps tests to specific compliance controls
+We've improved testing for CloudTrail log file validation by explicitly verifying that the `EnableLogFileValidation` property is set to `True` in the CloudTrail configuration.
 
 ## Future Enhancements
 
-Planned enhancements to the compliance testing framework:
-
-1. **Integration with CI/CD** - Automatically run compliance tests in CI/CD pipelines
-2. **Compliance Dashboards** - Generate interactive dashboards for compliance monitoring
-3. **Additional Frameworks** - Support for additional compliance frameworks (NIST, PCI DSS, etc.)
-4. **Automated Remediation** - Suggest remediation steps for uncovered controls
+1. **Integration Testing**: Implement integration tests for runtime-dependent controls
+2. **Policy Analysis**: Enhance policy analysis capabilities to validate complex IAM policies
+3. **Compliance Reporting**: Generate compliance reports based on test results
