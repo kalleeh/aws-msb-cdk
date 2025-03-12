@@ -7,13 +7,11 @@ from aws_msb_cdk.logging_stack import LoggingStack
 from aws_msb_cdk.logging_regional_stack import LoggingRegionalStack
 from aws_msb_cdk.security_regional_stack import SecurityRegionalStack
 from aws_msb_cdk.vpc_stack import VpcStack
-from aws_msb_cdk.vpc_endpoints_stack import VpcEndpointsStack
 from aws_msb_cdk.s3_security_stack import S3SecurityStack
 from aws_msb_cdk.kms_stack import KMSStack
 from aws_msb_cdk.network_security_stack import NetworkSecurityStack
 from aws_msb_cdk.compliance_stack import ComplianceStack
 from aws_msb_cdk.security_monitoring_stack import SecurityMonitoringStack
-from aws_msb_cdk.notifications_stack import NotificationsStack
 
 app = App()
 
@@ -38,34 +36,28 @@ if not target or target == "global":
     # IAM Stack with password policy
     iam_stack = IAMStack(app, "MSB-IAM-Global", env=global_env)
 
-    # KMS Stack
-    kms_stack = KMSStack(app, "MSB-KMS-Global", 
-        notifications_topic=None,  # Will be updated after notifications_stack is created
-        env=global_env
-    )
-
-    # Notifications Stack with SNS encryption
-    notifications_stack = NotificationsStack(app, "MSB-Notifications-Global",
-        kms_key=kms_stack.master_key,
-        notification_email=notification_email,
-        env=global_env
-    )
+    # KMS Stack (needs to be created early for encryption keys)
+    kms_stack = KMSStack(app, "MSB-KMS-Global", env=global_env)
 
     # S3 Security Stack (needs to be created early for other stacks to use)
     s3_security_stack = S3SecurityStack(app, "MSB-S3-Security", 
-        notifications_topic=notifications_stack.notifications_topic,
+        notifications_topic=None,  # Will be updated after logging_stack is created
         env=global_env
     )
 
-    # Logging Stack (uses S3 security configuration)
+    # Logging Stack (uses S3 security configuration and KMS keys)
     logging_stack = LoggingStack(app, "MSB-Logging-Global", 
         s3_security_stack=s3_security_stack,
         notification_email=notification_email,
+        kms_stack=kms_stack,
         env=global_env
     )
 
+    # Update S3 Security Stack with notifications topic
+    s3_security_stack.notifications_topic = logging_stack.notifications_topic
+
     # Update KMS Stack with notifications topic
-    kms_stack.notifications_topic = notifications_stack.notifications_topic
+    kms_stack.notifications_topic = logging_stack.notifications_topic
 
 # Regional resources - deploy in all target regions
 if not target or target == "regional":
@@ -96,7 +88,7 @@ if not target or target == "regional":
         else:
             # Use the resources created in this deployment
             logs_bucket = logging_stack.logs_bucket
-            notifications_topic = notifications_stack.notifications_topic
+            notifications_topic = logging_stack.notifications_topic
             config_role = logging_stack.config_role
 
         # Network Security Stack
@@ -125,15 +117,9 @@ if not target or target == "regional":
             env=regional_env
         )
 
-        # VPC Stack
+        # VPC Stack with VPC endpoints
         vpc_stack = VpcStack(app, f"MSB-VPC-Regional-{region}", 
             flow_logs_destination=network_security_stack.flow_logs_destination,
-            env=regional_env
-        )
-        
-        # VPC Endpoints Stack
-        vpc_endpoints_stack = VpcEndpointsStack(app, f"MSB-VPC-Endpoints-{region}",
-            vpc=vpc_stack.vpc,
             env=regional_env
         )
 

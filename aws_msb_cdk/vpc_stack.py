@@ -1,6 +1,7 @@
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
+    aws_iam as iam,
     CfnParameter,
 )
 from constructs import Construct
@@ -115,7 +116,109 @@ class VpcStack(Stack):
                 traffic_type=ec2.FlowLogTrafficType.ALL
             )
         
+        # Create VPC endpoints for commonly used services
+        self.create_vpc_endpoints(vpc)
+        
         # Export outputs
         self.vpc = vpc
         self.bastion_sg = bastion_sg
         self.app_sg = app_sg
+    
+    def create_vpc_endpoints(self, vpc):
+        """Create VPC endpoints for commonly used services (EC2.15)"""
+        
+        # Create security group for VPC endpoints
+        endpoint_security_group = ec2.SecurityGroup(self, "VpcEndpointSecurityGroup",
+            vpc=vpc,
+            description="Security group for VPC endpoints",
+            allow_all_outbound=False
+        )
+
+        # Allow HTTPS from within the VPC
+        endpoint_security_group.add_ingress_rule(
+            ec2.Peer.ipv4(vpc.vpc_cidr_block),
+            ec2.Port.tcp(443),
+            "Allow HTTPS from within the VPC"
+        )
+        
+        # Create gateway endpoints for S3 and DynamoDB
+        s3_endpoint = ec2.GatewayVpcEndpoint(self, "S3Endpoint",
+            vpc=vpc,
+            service=ec2.GatewayVpcEndpointAwsService.S3,
+            subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)]
+        )
+
+        # Add endpoint policy for S3
+        s3_endpoint.add_to_policy(
+            iam.PolicyStatement(
+                principals=[iam.AnyPrincipal()],
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:ListBucket"
+                ],
+                resources=["*"],
+                conditions={
+                    "StringEquals": {
+                        "aws:SourceVpc": vpc.vpc_id
+                    }
+                }
+            )
+        )
+
+        # DynamoDB Gateway Endpoint
+        dynamodb_endpoint = ec2.GatewayVpcEndpoint(self, "DynamoDBEndpoint",
+            vpc=vpc,
+            service=ec2.GatewayVpcEndpointAwsService.DYNAMODB,
+            subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)]
+        )
+
+        # Add endpoint policy for DynamoDB
+        dynamodb_endpoint.add_to_policy(
+            iam.PolicyStatement(
+                principals=[iam.AnyPrincipal()],
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan"
+                ],
+                resources=["*"],
+                conditions={
+                    "StringEquals": {
+                        "aws:SourceVpc": vpc.vpc_id
+                    }
+                }
+            )
+        )
+        
+        # List of services to create interface endpoints for
+        interface_services = [
+            "ssm",              # Systems Manager
+            "ssmmessages",      # Systems Manager Messages
+            "ec2messages",      # EC2 Messages
+            "kms",              # Key Management Service
+            "logs",             # CloudWatch Logs
+            "monitoring",       # CloudWatch Monitoring
+            "sqs",              # Simple Queue Service
+            "sns",              # Simple Notification Service
+            "secretsmanager",   # Secrets Manager
+            "ecr.api",          # ECR API
+            "ecr.dkr",          # ECR Docker Registry
+            "ecs",              # ECS
+            "lambda"            # Lambda
+        ]
+
+        # Create interface endpoints for each service
+        self.interface_endpoints = {}
+        for service in interface_services:
+            endpoint_name = f"{service.replace('.', '')}Endpoint"
+            
+            self.interface_endpoints[service] = ec2.InterfaceVpcEndpoint(
+                self, endpoint_name,
+                vpc=vpc,
+                service=ec2.InterfaceVpcEndpointAwsService(service),
+                private_dns_enabled=True,
+                security_groups=[endpoint_security_group],
+                subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
+            )
