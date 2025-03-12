@@ -1,0 +1,9 @@
+{
+  "app": "python3 app.py",
+  "context": {
+    "notification_email": "",
+    "global_region": "us-east-1",
+    "target_regions": ["us-east-1", "us-west-2"],
+    "aws-cdk:enableDiffNoFail": "true"
+  }
+}
