@@ -16,7 +16,7 @@ from aws_cdk import (
 from constructs import Construct
 
 class LoggingStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, notifications_topic=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # S3 Bucket for Logs using secure bucket configuration if available
@@ -61,17 +61,27 @@ class LoggingStack(Stack):
                 ]
             )
 
-        # SNS Topic for Notifications using L2 construct
-        notifications_topic = sns.Topic(self, "NotificationsTopic",
-            topic_name=f"msb-notifications-{self.region}",
-            display_name="MSB Security Notifications"
-        )
-        
-        # Add email subscription if provided
-        if notification_email:
-            notifications_topic.add_subscription(
-                sns_subs.EmailSubscription(notification_email)
+        # Use provided notifications topic or create a new one
+        if notifications_topic:
+            self.notifications_topic = notifications_topic
+        else:
+            # Get KMS key for SNS encryption if available
+            sns_key = None
+            if kms_stack and hasattr(kms_stack, 'master_key'):
+                sns_key = kms_stack.master_key
+            
+            # SNS Topic for Notifications with KMS encryption if key is available
+            self.notifications_topic = sns.Topic(self, "NotificationsTopic",
+                topic_name=f"msb-notifications-{self.region}",
+                display_name="MSB Security Notifications",
+                master_key=sns_key  # Will be None if no KMS key is available
             )
+            
+            # Add email subscription if provided
+            if notification_email:
+                self.notifications_topic.add_subscription(
+                    sns_subs.EmailSubscription(notification_email)
+                )
 
         # Get KMS key for CloudTrail encryption if available
         cloudtrail_key = None
@@ -155,7 +165,7 @@ class LoggingStack(Stack):
         
         # Add SNS action to the alarm
         unauthorized_api_alarm.add_alarm_action(
-            cloudwatch_actions.SnsAction(notifications_topic)
+            cloudwatch_actions.SnsAction(self.notifications_topic)
         )
         
         # AWS Config Role using L2 construct
@@ -198,7 +208,7 @@ class LoggingStack(Stack):
         
         # Export resources for other stacks
         self.logs_bucket = logs_bucket
-        self.notifications_topic = notifications_topic
+        self.notifications_topic = self.notifications_topic
         self.config_role = config_role
         self.cloudtrail_key = cloudtrail_key
         self.cloudtrail_log_group = cloudtrail_log_group
