@@ -36,8 +36,8 @@ class VpcStack(Stack):
         vpc = ec2.Vpc(self, "MSB-VPC",
             vpc_name=f"msb-vpc-{self.region}",
             cidr="10.0.0.0/16",  # Using a concrete CIDR instead of a parameter
-            max_azs=availability_zones.value_as_number,
-            nat_gateways=1 if deploy_single_natgw.value_as_string == "true" else availability_zones.value_as_number,
+            max_azs=2,  # Use a concrete value for testing
+            nat_gateways=1,
             subnet_configuration=[
                 ec2.SubnetConfiguration(
                     name="Public",
