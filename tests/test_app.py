@@ -49,7 +49,7 @@ def test_s3_security_stack_blocks_public_access():
     # Verify Lambda function for blocking public access
     template.has_resource_properties("AWS::Lambda::Function", {
         "Handler": "index.handler",
-        "Runtime": "python3.9",
+        "Runtime": "python3.13",
         "Timeout": 300  # Updated to match the actual timeout
     })
     
@@ -118,7 +118,7 @@ def test_network_security_stack_creates_flow_logs_resources():
     # Verify Lambda function for securing default VPC
     template.has_resource_properties("AWS::Lambda::Function", {
         "Handler": "index.handler",
-        "Runtime": "python3.9"
+        "Runtime": "python3.13"
     })
 
 def test_compliance_stack_creates_config_rules():
