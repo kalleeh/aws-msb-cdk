@@ -27,29 +27,40 @@ class IAMStack(Stack):
         self.create_access_analyzer()
         
     def create_password_policy(self):
-        """Create IAM password policy that meets CIS benchmarks"""
-        # CIS 1.8 - Ensure IAM password policy requires minimum length of 14 or greater
+        """Create IAM password policy aligned with NIST SP 800-63B and CIS v3.0.0"""
+        # CIS 1.8 - Ensure IAM password policy requires minimum length of 14 or greater (using 16)
         # CIS 1.9 - Ensure IAM password policy prevents password reuse
-        # CIS 1.10 - Ensure IAM password policy expires passwords within 90 days or less
         # CIS 1.11 - Ensure IAM password policy requires at least one uppercase letter
         # CIS 1.12 - Ensure IAM password policy requires at least one lowercase letter
         # CIS 1.13 - Ensure IAM password policy requires at least one symbol
         # CIS 1.14 - Ensure IAM password policy requires at least one number
-        
+        # NOTE: MaxPasswordAge intentionally omitted — NIST SP 800-63B (2017) and
+        # CIS AWS v3.0.0 recommend against periodic password expiration as it increases
+        # risk through predictable rotation patterns without security benefit.
+
         # Using CfnResource since CfnAccountPasswordPolicy is not available
         CfnResource(self, "PasswordPolicy",
             type="AWS::IAM::AccountPasswordPolicy",
             properties={
-                "MinimumPasswordLength": 14,
+                "MinimumPasswordLength": 16,
                 "RequireUppercaseCharacters": True,
                 "RequireLowercaseCharacters": True,
                 "RequireSymbols": True,
                 "RequireNumbers": True,
-                "MaxPasswordAge": 90,
                 "PasswordReusePrevention": 24,
                 "HardExpiry": False,
                 "AllowUsersToChangePassword": True
             }
+        )
+
+        # CIS 1.17 - Ensure a support role has been created to manage incidents with AWS Support
+        iam.Role(self, "AWSSupportRole",
+            role_name="msb-aws-support-role",
+            assumed_by=iam.AccountRootPrincipal(),
+            description="Role for AWS Support access - CIS 1.17",
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name("AWSSupportAccess")
+            ]
         )
         
     def create_iam_policy_checker(self):

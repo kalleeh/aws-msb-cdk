@@ -21,6 +21,9 @@ class LoggingStack(Stack):
 
         # S3 Bucket for Logs using secure bucket configuration if available
         if s3_security_stack:
+            # NOTE: Object Lock (WORM immutability) should also be enabled on this bucket
+            # for FSBP S3.11 / CIS 3.11 compliance. Object Lock must be set at bucket
+            # creation time and may need to be added inside create_secure_bucket().
             logs_bucket = s3_security_stack.create_secure_bucket(self, "LogsBucket",
                 bucket_name=f"msb-logs-{self.account}-{self.region}",
                 lifecycle_rules=[
@@ -46,6 +49,11 @@ class LoggingStack(Stack):
                 enforce_ssl=True,
                 versioned=True,
                 removal_policy=RemovalPolicy.RETAIN,
+                # S3 server access logging for FSBP CloudTrail.6 / CIS 3.6
+                server_access_logs_prefix="s3-access-logs/",
+                # Object Lock for WORM immutability (FSBP S3.11 / CIS 3.11)
+                object_lock_enabled=True,
+                object_lock_default_retention=s3.ObjectLockRetention.governance(Duration.days(365)),
                 lifecycle_rules=[
                     s3.LifecycleRule(
                         id="LogRetention",
@@ -69,14 +77,14 @@ class LoggingStack(Stack):
             sns_key = None
             if kms_stack and hasattr(kms_stack, 'master_key'):
                 sns_key = kms_stack.master_key
-            
+
             # SNS Topic for Notifications with KMS encryption if key is available
             self.notifications_topic = sns.Topic(self, "NotificationsTopic",
                 topic_name=f"msb-notifications-{self.region}",
                 display_name="MSB Security Notifications",
                 master_key=sns_key  # Will be None if no KMS key is available
             )
-            
+
             # Add email subscription if provided
             if notification_email:
                 self.notifications_topic.add_subscription(
@@ -95,7 +103,7 @@ class LoggingStack(Stack):
                 enable_key_rotation=True,
                 removal_policy=RemovalPolicy.RETAIN
             )
-            
+
             # Add CloudTrail service principal to key policy
             cloudtrail_key.add_to_resource_policy(
                 iam.PolicyStatement(
@@ -121,26 +129,60 @@ class LoggingStack(Stack):
             enable_file_validation=True,
             management_events=cloudtrail.ReadWriteType.ALL,
             trail_name="msb-cloudtrail",
-            encryption_key=cloudtrail_key  # Add KMS encryption (correct parameter name)
+            encryption_key=cloudtrail_key
         )
-        
-        # Enable data events for S3 and Lambda
-        trail.add_s3_event_selector([
-            cloudtrail.S3EventSelector(
-                bucket=logs_bucket
-            )
+
+        # Enable data events for the logs bucket via L2
+        trail.add_s3_event_selector(
+            [cloudtrail.S3EventSelector(bucket=logs_bucket)],
+            include_management_events=True,
+            read_write_type=cloudtrail.ReadWriteType.ALL
+        )
+
+        # Add advanced event selectors for ALL S3 buckets and ALL Lambda functions
+        # using the escape hatch since CDK L2 doesn't support wildcard selectors (CIS 3.10, 3.11)
+        cfn_trail = trail.node.default_child
+        cfn_trail.add_property_override("AdvancedEventSelectors", [
+            {
+                "Name": "All S3 data events",
+                "FieldSelectors": [
+                    {"Field": "eventCategory", "Equals": ["Data"]},
+                    {"Field": "resources.type", "Equals": ["AWS::S3::Object"]}
+                ]
+            },
+            {
+                "Name": "All Lambda data events",
+                "FieldSelectors": [
+                    {"Field": "eventCategory", "Equals": ["Data"]},
+                    {"Field": "resources.type", "Equals": ["AWS::Lambda::Function"]}
+                ]
+            }
         ])
-        
+
         # Get the CloudWatch Logs group created by CloudTrail
-        # CloudTrail automatically creates a log group with the name /aws/cloudtrail/trail-name
         cloudtrail_log_group = logs.LogGroup.from_log_group_name(
-            self, "CloudTrailLogGroup", 
+            self, "CloudTrailLogGroup",
             log_group_name="/aws/cloudtrail/msb-cloudtrail"
         )
-        
-        # Create metric filters and alarms for CloudTrail logs
-        
-        # 1. Unauthorized API calls metric filter and alarm (CloudWatch.2)
+
+        # ---------------------------------------------------------------------------
+        # CloudWatch Metric Filters and Alarms — full CIS v3.0.0 set (3.1-3.14)
+        # ---------------------------------------------------------------------------
+
+        def _make_alarm(construct_id, metric, alarm_name, alarm_description, threshold=1):
+            alarm = cloudwatch.Alarm(self, construct_id,
+                metric=metric,
+                threshold=threshold,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                evaluation_periods=1,
+                alarm_name=alarm_name,
+                alarm_description=alarm_description,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING
+            )
+            alarm.add_alarm_action(cloudwatch_actions.SnsAction(self.notifications_topic))
+            return alarm
+
+        # 1. Unauthorized API calls (CIS 3.1)
         unauthorized_api_metric = logs.MetricFilter(self, "UnauthorizedAPICallsMetricFilter",
             log_group=cloudtrail_log_group,
             filter_pattern=logs.FilterPattern.literal('{($.errorCode="*UnauthorizedOperation") || ($.errorCode="AccessDenied*")}'),
@@ -149,25 +191,148 @@ class LoggingStack(Stack):
             default_value=0,
             metric_value="1"
         )
-        
-        unauthorized_api_alarm = cloudwatch.Alarm(self, "UnauthorizedAPICallsAlarm",
-            metric=unauthorized_api_metric.metric(
-                statistic="Sum",
-                period=Duration.minutes(5)
-            ),
-            threshold=1,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            evaluation_periods=1,
+        _make_alarm("UnauthorizedAPICallsAlarm",
+            metric=unauthorized_api_metric.metric(statistic="Sum", period=Duration.minutes(5)),
             alarm_name="MSB-UnauthorizedAPICalls",
-            alarm_description="Alarm for unauthorized API calls that could indicate malicious activity",
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING
+            alarm_description="Unauthorized API calls — possible malicious activity (CIS 3.1)"
         )
-        
-        # Add SNS action to the alarm
-        unauthorized_api_alarm.add_alarm_action(
-            cloudwatch_actions.SnsAction(self.notifications_topic)
+
+        # 2. Console sign-in without MFA (CIS 3.2)
+        console_no_mfa_metric = logs.MetricFilter(self, "ConsoleSignInWithoutMFAMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName="ConsoleLogin") && ($.additionalEventData.MFAUsed !="Yes") && ($.userIdentity.type="IAMUser") && ($.responseElements.ConsoleLogin="Success")}'),
+            metric_namespace="LogMetrics",
+            metric_name="ConsoleSignInWithoutMFA",
+            default_value=0,
+            metric_value="1"
         )
-        
+        _make_alarm("ConsoleSignInWithoutMFAAlarm",
+            metric=console_no_mfa_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-ConsoleSignInWithoutMFA",
+            alarm_description="Console sign-in without MFA (CIS 3.2)"
+        )
+
+        # 3. CloudTrail configuration changes (CIS 3.5)
+        cloudtrail_config_metric = logs.MetricFilter(self, "CloudTrailConfigChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=CreateTrail) || ($.eventName=UpdateTrail) || ($.eventName=DeleteTrail) || ($.eventName=StartLogging) || ($.eventName=StopLogging)}'),
+            metric_namespace="LogMetrics",
+            metric_name="CloudTrailConfigChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("CloudTrailConfigChangesAlarm",
+            metric=cloudtrail_config_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-CloudTrailConfigChanges",
+            alarm_description="CloudTrail configuration changes (CIS 3.5)"
+        )
+
+        # 4. Console authentication failures (CIS 3.6) — threshold 3
+        console_auth_failures_metric = logs.MetricFilter(self, "ConsoleAuthFailuresMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=ConsoleLogin) && ($.errorMessage="Failed authentication")}'),
+            metric_namespace="LogMetrics",
+            metric_name="ConsoleAuthFailures",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("ConsoleAuthFailuresAlarm",
+            metric=console_auth_failures_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-ConsoleAuthFailures",
+            alarm_description="Console authentication failures (CIS 3.6)",
+            threshold=3
+        )
+
+        # 5. KMS CMK disabling or scheduled deletion (CIS 3.7)
+        kms_key_changes_metric = logs.MetricFilter(self, "KMSKeyChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventSource=kms.amazonaws.com) && (($.eventName=DisableKey) || ($.eventName=ScheduleKeyDeletion))}'),
+            metric_namespace="LogMetrics",
+            metric_name="KMSKeyChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("KMSKeyChangesAlarm",
+            metric=kms_key_changes_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-KMSKeyChanges",
+            alarm_description="KMS CMK disabling or scheduled deletion (CIS 3.7)"
+        )
+
+        # 6. S3 bucket policy changes (CIS 3.8)
+        s3_bucket_policy_metric = logs.MetricFilter(self, "S3BucketPolicyChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventSource=s3.amazonaws.com) && (($.eventName=PutBucketAcl) || ($.eventName=PutBucketPolicy) || ($.eventName=PutBucketCors) || ($.eventName=PutBucketLifecycle) || ($.eventName=PutBucketReplication) || ($.eventName=DeleteBucketPolicy) || ($.eventName=DeleteBucketCors) || ($.eventName=DeleteBucketLifecycle) || ($.eventName=DeleteBucketReplication))}'),
+            metric_namespace="LogMetrics",
+            metric_name="S3BucketPolicyChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("S3BucketPolicyChangesAlarm",
+            metric=s3_bucket_policy_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-S3BucketPolicyChanges",
+            alarm_description="S3 bucket policy changes (CIS 3.8)"
+        )
+
+        # 7. AWS Config configuration changes (CIS 3.9)
+        aws_config_changes_metric = logs.MetricFilter(self, "AWSConfigChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventSource=config.amazonaws.com) && (($.eventName=StopConfigurationRecorder) || ($.eventName=DeleteDeliveryChannel) || ($.eventName=PutDeliveryChannel) || ($.eventName=PutConfigurationRecorder))}'),
+            metric_namespace="LogMetrics",
+            metric_name="AWSConfigChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("AWSConfigChangesAlarm",
+            metric=aws_config_changes_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-AWSConfigChanges",
+            alarm_description="AWS Config configuration changes (CIS 3.9)"
+        )
+
+        # 8. Network gateway changes (CIS 3.12)
+        network_gateway_metric = logs.MetricFilter(self, "NetworkGatewayChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=CreateCustomerGateway) || ($.eventName=DeleteCustomerGateway) || ($.eventName=AttachInternetGateway) || ($.eventName=CreateInternetGateway) || ($.eventName=DeleteInternetGateway) || ($.eventName=DetachInternetGateway)}'),
+            metric_namespace="LogMetrics",
+            metric_name="NetworkGatewayChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("NetworkGatewayChangesAlarm",
+            metric=network_gateway_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-NetworkGatewayChanges",
+            alarm_description="Network gateway changes (CIS 3.12)"
+        )
+
+        # 9. Route table changes (CIS 3.13)
+        route_table_metric = logs.MetricFilter(self, "RouteTableChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=CreateRoute) || ($.eventName=CreateRouteTable) || ($.eventName=ReplaceRoute) || ($.eventName=ReplaceRouteTableAssociation) || ($.eventName=DeleteRouteTable) || ($.eventName=DeleteRoute) || ($.eventName=DisassociateRouteTable)}'),
+            metric_namespace="LogMetrics",
+            metric_name="RouteTableChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("RouteTableChangesAlarm",
+            metric=route_table_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-RouteTableChanges",
+            alarm_description="Route table changes (CIS 3.13)"
+        )
+
+        # 10. VPC changes (CIS 3.14)
+        vpc_changes_metric = logs.MetricFilter(self, "VPCChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=CreateVpc) || ($.eventName=DeleteVpc) || ($.eventName=ModifyVpcAttribute) || ($.eventName=AcceptVpcPeeringConnection) || ($.eventName=CreateVpcPeeringConnection) || ($.eventName=DeleteVpcPeeringConnection) || ($.eventName=RejectVpcPeeringConnection) || ($.eventName=AttachClassicLinkVpc) || ($.eventName=DetachClassicLinkVpc) || ($.eventName=DisableVpcClassicLink) || ($.eventName=EnableVpcClassicLink)}'),
+            metric_namespace="LogMetrics",
+            metric_name="VPCChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("VPCChangesAlarm",
+            metric=vpc_changes_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-VPCChanges",
+            alarm_description="VPC changes (CIS 3.14)"
+        )
+
         # AWS Config Role using L2 construct
         config_role = iam.Role(self, "ConfigRole",
             role_name=f"msb-config-role-{self.region}",
@@ -176,7 +341,7 @@ class LoggingStack(Stack):
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWS_ConfigRole")
             ]
         )
-        
+
         # Add S3 bucket policy for Config
         logs_bucket.add_to_resource_policy(
             iam.PolicyStatement(
@@ -190,7 +355,7 @@ class LoggingStack(Stack):
                 resources=[logs_bucket.bucket_arn]
             )
         )
-        
+
         logs_bucket.add_to_resource_policy(
             iam.PolicyStatement(
                 sid="AWSConfigBucketDelivery",
@@ -205,7 +370,7 @@ class LoggingStack(Stack):
                 }
             )
         )
-        
+
         # Export resources for other stacks
         self.logs_bucket = logs_bucket
         self.notifications_topic = self.notifications_topic
