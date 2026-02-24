@@ -12,23 +12,28 @@ This document provides detailed information about how each security control is i
 
 **Configuration**:
 ```python
-iam.CfnAccountPasswordPolicy(self, "PasswordPolicy",
-    max_password_age=90,
-    minimum_password_length=14,
-    password_reuse_prevention=24,
-    require_lowercase_characters=True,
-    require_numbers=True,
-    require_symbols=True,
-    require_uppercase_characters=True,
-    allow_users_to_change_password=True
+CfnResource(self, "PasswordPolicy",
+    type="AWS::IAM::AccountPasswordPolicy",
+    properties={
+        "MinimumPasswordLength": 16,
+        "RequireUppercaseCharacters": True,
+        "RequireLowercaseCharacters": True,
+        "RequireSymbols": True,
+        "RequireNumbers": True,
+        "PasswordReusePrevention": 24,
+        "HardExpiry": False,
+        "AllowUsersToChangePassword": True
+        # MaxPasswordAge intentionally omitted — NIST SP 800-63B and CIS v3.0.0
+        # recommend against periodic password expiration.
+    }
 )
 ```
 
 **Security Benefits**:
-- Enforces strong passwords that are harder to crack
-- Requires regular password rotation to limit the impact of credential compromise
-- Prevents password reuse to ensure fresh credentials
-- Aligns with CIS AWS Foundations Benchmark v3.0.0 recommendations 1.8-1.11
+- Enforces strong passwords (16-char minimum) that are harder to crack
+- Prevents password reuse across 24 previous passwords
+- No forced expiry — aligns with NIST SP 800-63B which recommends against periodic rotation as it encourages predictable patterns
+- Aligns with CIS AWS Foundations Benchmark v3.0.0 recommendations 1.8, 1.9, 1.11-1.14
 
 ### IAM Access Key Rotation Monitoring
 
@@ -580,23 +585,33 @@ cis_rules = [
 
 ### CIS Benchmark in Security Hub
 
-**Implementation Stack**: `ComplianceStack`
+**Implementation Stack**: `SecurityRegionalStack`
 
 **AWS Service**: AWS Security Hub
 
 **Configuration**:
 ```python
-# Enable CIS AWS Foundations Benchmark standard
-cis_standard = securityhub.CfnStandard(self, "CISStandard",
-    standards_arn="arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0"
+# Enable Security Hub
+security_hub = securityhub.CfnHub(self, "SecurityHub")
+
+# Enable FSBP v1.0.0 — AWS Foundational Security Best Practices (~200 controls)
+fsbp_standard = securityhub.CfnStandard(self, "FBSPStandard",
+    standards_arn=f"arn:aws:securityhub:{self.region}::standards/aws-foundational-security-best-practices/v/1.0.0"
 )
+fsbp_standard.node.add_dependency(security_hub)
+
+# Enable CIS AWS Foundations Benchmark v3.0.0 (~58 controls)
+cis_standard = securityhub.CfnStandard(self, "CISv3Standard",
+    standards_arn=f"arn:aws:securityhub:{self.region}::standards/cis-aws-foundations-benchmark/v/3.0.0"
+)
+cis_standard.node.add_dependency(security_hub)
 ```
 
 **Security Benefits**:
-- Evaluates environment against industry best practices
-- Provides a comprehensive security assessment
-- Identifies security gaps and remediation steps
-- Aligns with CIS AWS Foundations Benchmark v3.0.0 recommendation 3.10
+- Enables both FSBP and CIS v3.0.0 standards simultaneously for comprehensive coverage
+- Evaluates environment against ~250 combined controls
+- Provides a real-time posture score and per-control pass/fail in the Security Hub dashboard
+- Native `CfnStandard` construct used — no custom resource or Lambda required
 
 ## Incident Response Controls
 

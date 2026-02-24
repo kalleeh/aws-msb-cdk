@@ -91,10 +91,10 @@ class TestLoggingStack:
         template.resource_count_is("AWS::KMS::Alias", 1)
     
     def test_cloudwatch_metric_filter_created(self, template):
-        # Verify metric filter is created
-        template.resource_count_is("AWS::Logs::MetricFilter", 1)
-        
-        # Verify filter properties
+        # Verify all 10 CIS v3.0.0 metric filters are created (CIS 3.1-3.14)
+        template.resource_count_is("AWS::Logs::MetricFilter", 10)
+
+        # Verify the unauthorized API calls filter (CIS 3.1)
         template.has_resource_properties("AWS::Logs::MetricFilter", {
             "FilterPattern": '{($.errorCode="*UnauthorizedOperation") || ($.errorCode="AccessDenied*")}',
             "MetricTransformations": [
@@ -105,18 +105,45 @@ class TestLoggingStack:
                 }
             ]
         })
-    
+
+        # Verify console sign-in without MFA filter (CIS 3.2)
+        template.has_resource_properties("AWS::Logs::MetricFilter", {
+            "MetricTransformations": [
+                Match.object_like({"MetricName": "ConsoleSignInWithoutMFA"})
+            ]
+        })
+
+        # Verify KMS key changes filter (CIS 3.7)
+        template.has_resource_properties("AWS::Logs::MetricFilter", {
+            "MetricTransformations": [
+                Match.object_like({"MetricName": "KMSKeyChanges"})
+            ]
+        })
+
+        # Verify VPC changes filter (CIS 3.14)
+        template.has_resource_properties("AWS::Logs::MetricFilter", {
+            "MetricTransformations": [
+                Match.object_like({"MetricName": "VPCChanges"})
+            ]
+        })
+
     def test_cloudwatch_alarm_created(self, template):
-        # Verify alarm is created
-        template.resource_count_is("AWS::CloudWatch::Alarm", 1)
-        
-        # Verify alarm properties
+        # Verify all 10 CIS v3.0.0 alarms are created
+        template.resource_count_is("AWS::CloudWatch::Alarm", 10)
+
+        # Verify the unauthorized API calls alarm (CIS 3.1)
         template.has_resource_properties("AWS::CloudWatch::Alarm", {
             "AlarmName": "MSB-UnauthorizedAPICalls",
             "ComparisonOperator": "GreaterThanOrEqualToThreshold",
             "EvaluationPeriods": 1,
             "Threshold": 1,
             "TreatMissingData": "notBreaching"
+        })
+
+        # Verify console auth failures alarm uses threshold of 3 (CIS 3.6)
+        template.has_resource_properties("AWS::CloudWatch::Alarm", {
+            "AlarmName": "MSB-ConsoleAuthFailures",
+            "Threshold": 3
         })
     
     def test_iam_roles_created(self, template):

@@ -9,26 +9,29 @@ from aws_msb_cdk.kms_stack import KMSStack
 class TestCompliance:
     def test_iam_password_policy(self):
         """
-        Test IAM password policy meets CIS benchmarks
-        - CIS AWS 3.0.0: 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14
+        Test IAM password policy meets NIST SP 800-63B and CIS v3.0.0 benchmarks
+        - CIS AWS 3.0.0: 1.8, 1.9, 1.11, 1.12, 1.13, 1.14
+        - NOTE: MaxPasswordAge intentionally omitted per NIST SP 800-63B recommendation
+          against periodic password expiration. CIS v3.0.0 dropped this requirement.
         """
         # GIVEN
         app = cdk.App()
-        
+
         # WHEN
         stack = IAMStack(app, "TestIAMStack")
         template = Template.from_stack(stack)
-        
+
         # THEN
         # Verify password policy is created with proper settings
         template.has_resource_properties("AWS::IAM::AccountPasswordPolicy", {
-            "MinimumPasswordLength": 14,
+            "MinimumPasswordLength": 16,
             "RequireUppercaseCharacters": True,
             "RequireLowercaseCharacters": True,
             "RequireSymbols": True,
             "RequireNumbers": True,
-            "MaxPasswordAge": 90,
-            "PasswordReusePrevention": 24
+            "PasswordReusePrevention": 24,
+            "HardExpiry": False,
+            "AllowUsersToChangePassword": True
         })
         
     def test_iam_access_analyzer(self):

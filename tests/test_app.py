@@ -24,14 +24,14 @@ def test_iam_stack_creates_password_policy():
     # THEN
     template.has_resource("AWS::IAM::AccountPasswordPolicy", {
         "Properties": {
-            "MaxPasswordAge": 90,
-            "MinimumPasswordLength": 14,
+            "MinimumPasswordLength": 16,
             "PasswordReusePrevention": 24,
             "RequireLowercaseCharacters": True,
             "RequireNumbers": True,
             "RequireSymbols": True,
             "RequireUppercaseCharacters": True,
-            "AllowUsersToChangePassword": True
+            "AllowUsersToChangePassword": True,
+            "HardExpiry": False
         }
     })
 
