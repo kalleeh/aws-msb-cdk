@@ -197,7 +197,7 @@ class ComplianceStack(Stack):
             identifier="LAMBDA_FUNCTION_SETTINGS_CHECK",
             description="Checks if Lambda functions use supported runtimes (FSBP Lambda.2)",
             input_parameters={
-                "runtime": "python3.11,python3.12,nodejs20.x,nodejs22.x,java21,java17,dotnet8"
+                "runtime": "python3.11,python3.12,python3.13,nodejs20.x,nodejs22.x,java21,java17,dotnet8"
             }
         )
 

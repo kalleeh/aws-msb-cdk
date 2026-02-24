@@ -118,7 +118,7 @@ class TestCompliance:
         # Verify Lambda function for IAM policy checking is created
         template.has_resource_properties("AWS::Lambda::Function", {
             "Handler": "index.handler",
-            "Runtime": "python3.9",
+            "Runtime": "python3.13",
             "Timeout": 60
         })
         

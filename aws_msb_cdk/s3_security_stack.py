@@ -96,7 +96,7 @@ class S3SecurityStack(Stack):
         """Create Lambda function to enforce bucket-level public access blocks"""
         # Create the Lambda function
         s3_bucket_public_access_checker = lambda_.Function(self, "S3BucketPublicAccessChecker",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=lambda_.Code.from_inline("""
 import boto3

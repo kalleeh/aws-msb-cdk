@@ -40,7 +40,7 @@ setuptools.setup(
             "types-boto3==1.0.2",
         ],
     },
-    python_requires=">=3.6",
+    python_requires=">=3.13",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

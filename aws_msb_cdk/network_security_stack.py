@@ -50,7 +50,7 @@ class NetworkSecurityStack(Stack):
         """Create Lambda function to secure default security groups"""
         # Create the Lambda function
         secure_default_sg_function = lambda_.Function(self, "SecureDefaultSGFunction",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=lambda_.Code.from_inline("""
 import boto3

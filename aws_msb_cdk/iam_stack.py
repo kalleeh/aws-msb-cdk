@@ -74,7 +74,7 @@ class IAMStack(Stack):
             
         # Create Lambda function to check for IAM policies attached directly to users
         iam_policy_checker = lambda_.Function(self, "IAMPolicyChecker",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=lambda_.Code.from_asset("lambda/iam_policy_checker"),
             timeout=Duration.seconds(60),
