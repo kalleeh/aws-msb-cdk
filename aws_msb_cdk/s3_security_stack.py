@@ -1,12 +1,12 @@
 from aws_cdk import (
     Stack,
     aws_iam as iam,
-    aws_sns as sns,
     aws_lambda as lambda_,
     aws_events as events,
     aws_events_targets as targets,
     aws_s3 as s3,
     Duration,
+    RemovalPolicy,
     custom_resources as cr,
 )
 from constructs import Construct
@@ -42,55 +42,28 @@ class S3SecurityStack(Stack):
             ])
         )
 
-        # Set default encryption for S3 buckets (CIS 2.1.1)
-        self.set_default_bucket_encryption()
-        
         # Create Lambda function to enforce bucket-level public access blocks (CIS 2.1.5)
         self.create_bucket_public_access_checker()
         
-    def create_secure_bucket(self, scope, id, bucket_name=None, versioned=True, lifecycle_rules=None, encryption=s3.BucketEncryption.S3_MANAGED):
+    def create_secure_bucket(self, scope, id, bucket_name=None, versioned=True,
+                             lifecycle_rules=None,
+                             encryption=s3.BucketEncryption.S3_MANAGED,
+                             object_lock_enabled=False,
+                             object_lock_default_retention=None):
         """Create a secure S3 bucket with best practices"""
         bucket = s3.Bucket(scope, id,
             bucket_name=bucket_name,
-            versioned=versioned,
             encryption=encryption,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
+            versioned=versioned,
+            removal_policy=RemovalPolicy.RETAIN,
+            object_lock_enabled=object_lock_enabled,
+            object_lock_default_retention=object_lock_default_retention,
             lifecycle_rules=lifecycle_rules or []
         )
-        
-        return bucket
 
-    def set_default_bucket_encryption(self):
-        """Set default encryption for S3 buckets"""
-        default_encryption = cr.AwsCustomResource(self, "S3DefaultEncryption",
-            on_create=cr.AwsSdkCall(
-                service="S3Control",
-                action="putBucketEncryption",
-                parameters={
-                    "AccountId": self.account,
-                    "BucketEncryption": {
-                        "ServerSideEncryptionConfiguration": {
-                            "Rules": [
-                                {
-                                    "ApplyServerSideEncryptionByDefault": {
-                                        "SSEAlgorithm": "AES256"
-                                    },
-                                    "BucketKeyEnabled": True
-                                }
-                            ]
-                        }
-                    }
-                },
-                physical_resource_id=cr.PhysicalResourceId.of("s3-default-encryption")
-            ),
-            policy=cr.AwsCustomResourcePolicy.from_statements([
-                iam.PolicyStatement(
-                    actions=["s3:PutEncryptionConfiguration"],
-                    resources=["*"]
-                )
-            ])
-        )
+        return bucket
 
     def create_bucket_public_access_checker(self):
         """Create Lambda function to enforce bucket-level public access blocks"""

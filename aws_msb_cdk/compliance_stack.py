@@ -86,17 +86,29 @@ class ComplianceStack(Stack):
 
         # --- IAM ---
 
-        # FSBP IAM.3 / CIS 1.14 - Access keys rotated within 90 days
+        # FSBP IAM.3 / CIS 1.14 - Access keys rotated within 45 days
         config.ManagedRule(self, "AccessKeysRotatedRule",
             identifier="ACCESS_KEYS_ROTATED",
-            description="Checks if IAM access keys are rotated within 90 days",
-            input_parameters={"maxAccessKeyAge": "90"}
+            description="Checks if IAM access keys are rotated within 45 days",
+            input_parameters={"maxAccessKeyAge": "45"}
         )
 
         # FSBP IAM.5 / CIS 1.10 - MFA enabled for console access
         config.ManagedRule(self, "MFAEnabledForConsoleAccessRule",
             identifier="MFA_ENABLED_FOR_IAM_CONSOLE_ACCESS",
             description="Checks if MFA is enabled for all IAM users with console access"
+        )
+
+        # FSBP IAM.1 - IAM policies should not allow full administrative privileges
+        config.ManagedRule(self, "IAMAdminPolicyRule",
+            identifier="IAM_POLICY_NO_STATEMENTS_WITH_ADMIN_ACCESS",
+            description="Checks if IAM policies allow full administrative privileges (FSBP IAM.1)"
+        )
+
+        # CIS 1.4 / FSBP IAM.4 - Ensure no root user account access keys exist
+        config.ManagedRule(self, "RootAccessKeyRule",
+            identifier="IAM_ROOT_ACCESS_KEY_CHECK",
+            description="Checks if root user access keys exist (CIS 1.4 / FSBP IAM.4)"
         )
 
         # CIS 1.5 - Root account MFA enabled
@@ -108,7 +120,15 @@ class ComplianceStack(Stack):
         # CIS 1.7 - IAM password policy
         config.ManagedRule(self, "IAMPasswordPolicyRule",
             identifier="IAM_PASSWORD_POLICY",
-            description="Checks if the IAM password policy meets requirements"
+            description="Checks if the IAM password policy meets requirements",
+            input_parameters={
+                "RequireUppercaseCharacters": "true",
+                "RequireLowercaseCharacters": "true",
+                "RequireSymbols": "true",
+                "RequireNumbers": "true",
+                "MinimumPasswordLength": "16",
+                "PasswordReusePrevention": "24"
+            }
         )
 
         # --- S3 ---
@@ -178,10 +198,29 @@ class ComplianceStack(Stack):
             input_parameters={"blockedPort1": "3389"}
         )
 
+        # FSBP EC2.18 - Security groups should not allow unrestricted access to high-risk ports
+        config.ManagedRule(self, "SGOpenPortsRule",
+            identifier="RESTRICTED_INCOMING_TRAFFIC",
+            description="Checks security groups for unrestricted access to common attack ports (FSBP EC2.18)",
+            input_parameters={
+                "blockedPort1": "20",
+                "blockedPort2": "21",
+                "blockedPort3": "3306",
+                "blockedPort4": "4333",
+                "blockedPort5": "23"
+            }
+        )
+
         # FSBP EC2.15 - Subnets should not auto-assign public IPs
         config.ManagedRule(self, "SubnetAutoAssignPublicIPRule",
             identifier="SUBNET_AUTO_ASSIGN_PUBLIC_IP_DISABLED",
             description="Checks if subnets are configured to auto-assign public IPs (FSBP EC2.15)"
+        )
+
+        # FSBP EC2.1 - EBS snapshots should not be publicly restorable
+        config.ManagedRule(self, "EBSSnapshotPublicRule",
+            identifier="EBS_SNAPSHOT_PUBLIC_RESTORABLE_CHECK",
+            description="Checks if EBS snapshots are publicly restorable (FSBP EC2.1)"
         )
 
         # --- Lambda ---

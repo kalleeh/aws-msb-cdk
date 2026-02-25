@@ -10,8 +10,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="AWS MSB Team",
-    package_dir={"": "aws_msb_cdk"},
-    packages=setuptools.find_packages(where="aws_msb_cdk"),
+    packages=setuptools.find_packages(exclude=["tests", "tests.*"]),
     install_requires=[
         "aws-cdk-lib>=2.100.0",
         "constructs>=10.3.0",
@@ -40,7 +39,7 @@ setuptools.setup(
             "types-boto3==1.0.2",
         ],
     },
-    python_requires=">=3.13",
+    python_requires=">=3.9",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

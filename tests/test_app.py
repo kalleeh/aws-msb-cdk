@@ -130,35 +130,25 @@ def test_compliance_stack_creates_config_rules():
     template = Template.from_stack(stack)
     
     # THEN
-    # Verify AWS Config Rules exist
-    try:
-        template.resource_count_is("AWS::Config::ConfigRule", 1)
-    except:
-        # If no config rules exist, we'll just pass the test
-        pass
+    # Verify AWS Config Rules exist (compliance stack has ~26 rules)
+    rules = template.find_resources("AWS::Config::ConfigRule")
+    assert len(rules) >= 20
 
 def test_security_monitoring_stack_creates_event_rules():
     # GIVEN
+    import aws_cdk.aws_sns as sns
     app = cdk.App()
-    
+    topic_stack = cdk.Stack(app, "TopicStack")
+    mock_topic = sns.Topic(topic_stack, "MockTopic")
+
     # WHEN
-    stack = SecurityMonitoringStack(app, "TestSecurityMonitoringStack", notifications_topic=None)
+    stack = SecurityMonitoringStack(app, "TestSecurityMonitoringStack", notifications_topic=mock_topic)
     template = Template.from_stack(stack)
-    
+
     # THEN
-    # Verify EventBridge Rules
-    try:
-        template.resource_count_is("AWS::Events::Rule", 1)
-    except:
-        # If no rules exist, we'll just pass the test
-        pass
-    
-    # Verify Lambda function exists
-    try:
-        template.resource_count_is("AWS::Lambda::Function", 1)
-    except:
-        # If no Lambda functions exist, we'll just pass the test
-        pass
+    # Verify EventBridge Rules - at least 3 should exist (GuardDuty, SecurityHub, IAM, SG, NACL, Root)
+    rules = template.find_resources("AWS::Events::Rule")
+    assert len(rules) >= 3
 
 def test_security_regional_stack_creates_security_services():
     # GIVEN
@@ -170,13 +160,9 @@ def test_security_regional_stack_creates_security_services():
     
     # THEN
     # Verify at least one security service is created
-    try:
-        template.resource_count_is("AWS::IAM::Role", 1)
-    except:
-        # If no IAM roles exist, we'll just pass the test
-        pass
+    roles = template.find_resources("AWS::IAM::Role")
+    assert len(roles) >= 1
 
-def test_multi_region_deployment():
-    # This test is a placeholder that always passes
-    # The actual multi-region deployment is tested in test_imports.py
-    assert True
+    # Verify GuardDuty detector is created
+    template.resource_count_is("AWS::GuardDuty::Detector", 1)
+

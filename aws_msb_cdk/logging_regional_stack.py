@@ -39,6 +39,6 @@ class LoggingRegionalStack(Stack):
         
         # Create CloudWatch Log Group for VPC Flow Logs
         vpc_flow_logs = logs.LogGroup(self, "VPCFlowLogsGroup",
-            log_group_name=f"/aws/vpc/flowlogs/{self.region}",
+            log_group_name=f"/aws/vpc/flowlogs/{self.account}/{self.region}",
             retention=logs.RetentionDays.ONE_YEAR
         )

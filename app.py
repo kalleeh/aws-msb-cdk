@@ -14,15 +14,28 @@ from aws_msb_cdk.compliance_stack import ComplianceStack
 from aws_msb_cdk.security_monitoring_stack import SecurityMonitoringStack
 
 app = App()
+from cdk_nag import AwsSolutionsChecks
+from aws_cdk import Aspects
+Aspects.of(app).add(AwsSolutionsChecks(verbose=False))
+
+from aws_cdk import Tags
+Tags.of(app).add("Project", "MSB")
+Tags.of(app).add("ManagedBy", "CDK")
+Tags.of(app).add("Environment", "Production")
 
 # Get deployment context
 notification_email = app.node.try_get_context("notification_email")
 global_region = app.node.try_get_context("global_region") or "us-east-1"
 target_regions = app.node.try_get_context("target_regions") or [global_region]
 target = app.node.try_get_context("target")  # Optional: 'global' or 'regional'
+if target and target not in ["global", "regional"]:
+    raise ValueError(f"Invalid target '{target}'. Must be 'global' or 'regional'.")
 
 if not notification_email:
-    print("WARNING: notification_email not provided in context. Please provide it using --context notification_email=your.email@example.com")
+    raise ValueError(
+        "notification_email is required. Provide it with: "
+        "--context notification_email=your.email@example.com"
+    )
 
 # Account ID is the same for all environments
 account_id = os.environ.get('CDK_DEFAULT_ACCOUNT')
@@ -34,30 +47,40 @@ if not target or target == "global":
     print(f"Deploying global resources in {global_region}")
     
     # IAM Stack with password policy
-    iam_stack = IAMStack(app, "MSB-IAM-Global", env=global_env)
+    iam_stack = IAMStack(app, "MSB-IAM-Global", env=global_env, termination_protection=True)
 
     # KMS Stack (needs to be created early for encryption keys)
-    kms_stack = KMSStack(app, "MSB-KMS-Global", env=global_env)
+    kms_stack = KMSStack(app, "MSB-KMS-Global", env=global_env, termination_protection=True)
 
-    # S3 Security Stack (needs to be created early for other stacks to use)
-    s3_security_stack = S3SecurityStack(app, "MSB-S3-Security", 
-        notifications_topic=None,  # Will be updated after logging_stack is created
-        env=global_env
-    )
-
-    # Logging Stack (uses S3 security configuration and KMS keys)
-    logging_stack = LoggingStack(app, "MSB-Logging-Global", 
-        s3_security_stack=s3_security_stack,
+    # Global stacks — correct order:
+    # LoggingStack first — it creates the SNS topic and its own secure log bucket (fallback path)
+    logging_stack = LoggingStack(app, "MSB-Logging-Global",
         notification_email=notification_email,
         kms_stack=kms_stack,
+        env=global_env,
+        termination_protection=True
+    )
+
+    # KMSStack can store the topic reference (doesn't use it at construction time)
+    kms_stack.notifications_topic = logging_stack.notifications_topic
+
+    # S3SecurityStack now gets the real topic from the start
+    s3_security_stack = S3SecurityStack(app, "MSB-S3-Security",
+        notifications_topic=logging_stack.notifications_topic,
         env=global_env
     )
 
-    # Update S3 Security Stack with notifications topic
-    s3_security_stack.notifications_topic = logging_stack.notifications_topic
-
-    # Update KMS Stack with notifications topic
-    kms_stack.notifications_topic = logging_stack.notifications_topic
+    from aws_cdk import CfnOutput
+    CfnOutput(logging_stack, "NotificationsTopicArn",
+        value=logging_stack.notifications_topic.topic_arn,
+        description="MSB Security Notifications SNS Topic ARN",
+        export_name="MSB-NotificationsTopicArn"
+    )
+    CfnOutput(logging_stack, "LogsBucketName",
+        value=logging_stack.logs_bucket.bucket_name,
+        description="MSB Centralized Logs S3 Bucket",
+        export_name="MSB-LogsBucketName"
+    )
 
 # Regional resources - deploy in all target regions
 if not target or target == "regional":
