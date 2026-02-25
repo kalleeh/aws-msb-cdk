@@ -2,35 +2,12 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
     aws_iam as iam,
-    CfnParameter,
 )
 from constructs import Construct
 
 class VpcStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, flow_logs_destination=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
-        # Parameters
-        vpc_cidr = CfnParameter(self, "VpcCIDR",
-            type="String",
-            description="CIDR block for the VPC",
-            default="10.0.0.0/16"
-        )
-
-        availability_zones = CfnParameter(self, "AvailabilityZones",
-            type="Number",
-            description="Number of Availability Zones to use",
-            default="2",
-            min_value=1,
-            max_value=3
-        )
-
-        deploy_single_natgw = CfnParameter(self, "DeploySingleNATGW",
-            type="String",
-            description="If true, deploys a single NAT Gateway in the first AZ to save costs",
-            default="true",
-            allowed_values=["true", "false"]
-        )
 
         # VPC using L2 construct
         vpc = ec2.Vpc(self, "MSB-VPC",
@@ -108,8 +85,8 @@ class VpcStack(Stack):
             "Allow HTTPS outbound"
         )
         
-        # Add VPC Flow Logs if destination is provided
-        if flow_logs_destination:
+        # Add FlowLog only if destination is a FlowLogDestination object (not a dict)
+        if flow_logs_destination and hasattr(flow_logs_destination, 'bind'):
             ec2.FlowLog(self, "VPCFlowLog",
                 resource_type=ec2.FlowLogResourceType.from_vpc(vpc),
                 destination=flow_logs_destination,
@@ -119,6 +96,13 @@ class VpcStack(Stack):
         # Create VPC endpoints for commonly used services
         self.create_vpc_endpoints(vpc)
         
+        from aws_cdk import CfnOutput
+        CfnOutput(self, "VpcId",
+            value=vpc.vpc_id,
+            description="MSB VPC ID",
+            export_name=f"MSB-VpcId-{self.region}"
+        )
+
         # Export outputs
         self.vpc = vpc
         self.bastion_sg = bastion_sg

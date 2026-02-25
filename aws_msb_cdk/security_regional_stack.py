@@ -5,6 +5,8 @@ from aws_cdk import (
     aws_iam as iam,
     aws_s3 as s3,
     aws_macie as macie,
+    aws_events as events,
+    aws_events_targets as targets,
     Duration,
     RemovalPolicy,
     custom_resources as cr,
@@ -154,6 +156,32 @@ class SecurityRegionalStack(Stack):
             finding_publishing_frequency="FIFTEEN_MINUTES",
             status="ENABLED"
         )
+
+        # ------------------------------------------------------------------ #
+        # EventBridge rules to route security findings to SNS notifications
+        # ------------------------------------------------------------------ #
+        if notifications_topic:
+            # Inspector v2 findings → SNS
+            events.Rule(self, "InspectorFindingsRule",
+                rule_name=f"msb-inspector-findings-{self.region}",
+                description="Routes Inspector v2 findings to SNS notifications",
+                event_pattern=events.EventPattern(
+                    source=["aws.inspector2"],
+                    detail_type=["Inspector2 Finding"]
+                ),
+                targets=[targets.SnsTopic(notifications_topic)]
+            )
+
+            # Macie findings → SNS
+            events.Rule(self, "MacieFindingsRule",
+                rule_name=f"msb-macie-findings-{self.region}",
+                description="Routes Macie findings to SNS notifications",
+                event_pattern=events.EventPattern(
+                    source=["aws.macie2"],
+                    detail_type=["Macie Finding"]
+                ),
+                targets=[targets.SnsTopic(notifications_topic)]
+            )
 
         # ------------------------------------------------------------------ #
         # Security Hub Automation Rules - suppress manual-action controls

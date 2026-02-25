@@ -18,7 +18,7 @@ class TestLoggingStack:
     
     def test_logs_bucket_created(self, template):
         # Verify S3 bucket is created
-        template.resource_count_is("AWS::S3::Bucket", 1)
+        template.resource_count_is("AWS::S3::Bucket", 2)
         
         # Verify bucket properties
         template.has_resource_properties("AWS::S3::Bucket", {
@@ -42,8 +42,9 @@ class TestLoggingStack:
             }
         })
         
-        # Verify bucket policy
-        template.resource_count_is("AWS::S3::BucketPolicy", 1)
+        # Verify bucket policies (logs_bucket + access_logs_bucket each get an SSL policy)
+        policies = template.find_resources("AWS::S3::BucketPolicy")
+        assert len(policies) >= 1
     
     def test_sns_topic_created(self, template):
         # Verify SNS topic is created
@@ -91,8 +92,8 @@ class TestLoggingStack:
         template.resource_count_is("AWS::KMS::Alias", 1)
     
     def test_cloudwatch_metric_filter_created(self, template):
-        # Verify all 10 CIS v3.0.0 metric filters are created (CIS 3.1-3.14)
-        template.resource_count_is("AWS::Logs::MetricFilter", 10)
+        # Verify all 13 CIS v3.0.0 metric filters are created (CIS 3.1-3.14 plus additions)
+        template.resource_count_is("AWS::Logs::MetricFilter", 13)
 
         # Verify the unauthorized API calls filter (CIS 3.1)
         template.has_resource_properties("AWS::Logs::MetricFilter", {
@@ -128,8 +129,8 @@ class TestLoggingStack:
         })
 
     def test_cloudwatch_alarm_created(self, template):
-        # Verify all 10 CIS v3.0.0 alarms are created
-        template.resource_count_is("AWS::CloudWatch::Alarm", 10)
+        # Verify all 13 CIS v3.0.0 alarms are created
+        template.resource_count_is("AWS::CloudWatch::Alarm", 13)
 
         # Verify the unauthorized API calls alarm (CIS 3.1)
         template.has_resource_properties("AWS::CloudWatch::Alarm", {

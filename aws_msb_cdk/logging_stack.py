@@ -21,6 +21,7 @@ class LoggingStack(Stack):
 
         # S3 Bucket for Logs using secure bucket configuration if available
         if s3_security_stack:
+            access_logs_bucket = None
             # NOTE: Object Lock (WORM immutability) should also be enabled on this bucket
             # for FSBP S3.11 / CIS 3.11 compliance. Object Lock must be set at bucket
             # creation time and may need to be added inside create_secure_bucket().
@@ -41,7 +42,23 @@ class LoggingStack(Stack):
                 ]
             )
         else:
-            # Fallback if s3_security_stack is not provided
+            # Dedicated bucket for S3 access logs (CIS 3.6 requires separate bucket)
+            access_logs_bucket = s3.Bucket(self, "AccessLogsBucket",
+                bucket_name=f"msb-access-logs-{self.account}-{self.region}",
+                encryption=s3.BucketEncryption.S3_MANAGED,
+                block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+                enforce_ssl=True,
+                versioned=False,
+                removal_policy=RemovalPolicy.RETAIN,
+                lifecycle_rules=[
+                    s3.LifecycleRule(
+                        id="AccessLogsRetention",
+                        enabled=True,
+                        expiration=Duration.days(90)
+                    )
+                ]
+            )
+
             logs_bucket = s3.Bucket(self, "LogsBucket",
                 bucket_name=f"msb-logs-{self.account}-{self.region}",
                 encryption=s3.BucketEncryption.S3_MANAGED,
@@ -49,9 +66,8 @@ class LoggingStack(Stack):
                 enforce_ssl=True,
                 versioned=True,
                 removal_policy=RemovalPolicy.RETAIN,
-                # S3 server access logging for FSBP CloudTrail.6 / CIS 3.6
-                server_access_logs_prefix="s3-access-logs/",
-                # Object Lock for WORM immutability (FSBP S3.11 / CIS 3.11)
+                server_access_logs_bucket=access_logs_bucket,
+                server_access_logs_prefix="cloudtrail-logs/",
                 object_lock_enabled=True,
                 object_lock_default_retention=s3.ObjectLockRetention.governance(Duration.days(365)),
                 lifecycle_rules=[
@@ -108,7 +124,7 @@ class LoggingStack(Stack):
             cloudtrail_key.add_to_resource_policy(
                 iam.PolicyStatement(
                     sid="AllowCloudTrailToEncryptLogs",
-                    actions=["kms:GenerateDataKey*"],
+                    actions=["kms:GenerateDataKey*", "kms:DescribeKey"],
                     principals=[iam.ServicePrincipal("cloudtrail.amazonaws.com")],
                     resources=["*"],
                     conditions={
@@ -333,6 +349,51 @@ class LoggingStack(Stack):
             alarm_description="VPC changes (CIS 3.14)"
         )
 
+        # 11. IAM policy changes (CIS 4.4)
+        iam_policy_changes_metric = logs.MetricFilter(self, "IAMPolicyChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=DeleteGroupPolicy)||($.eventName=DeleteRolePolicy)||($.eventName=DeleteUserPolicy)||($.eventName=PutGroupPolicy)||($.eventName=PutRolePolicy)||($.eventName=PutUserPolicy)||($.eventName=CreatePolicy)||($.eventName=DeletePolicy)||($.eventName=CreatePolicyVersion)||($.eventName=DeletePolicyVersion)||($.eventName=AttachRolePolicy)||($.eventName=DetachRolePolicy)||($.eventName=AttachUserPolicy)||($.eventName=DetachUserPolicy)||($.eventName=AttachGroupPolicy)||($.eventName=DetachGroupPolicy)}'),
+            metric_namespace="LogMetrics",
+            metric_name="IAMPolicyChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("IAMPolicyChangesAlarm",
+            metric=iam_policy_changes_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-IAMPolicyChanges",
+            alarm_description="IAM policy changes (CIS 4.4)"
+        )
+
+        # 12. Security group changes (CIS 4.15)
+        sg_changes_metric = logs.MetricFilter(self, "SecurityGroupChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=AuthorizeSecurityGroupIngress)||($.eventName=AuthorizeSecurityGroupEgress)||($.eventName=RevokeSecurityGroupIngress)||($.eventName=RevokeSecurityGroupEgress)||($.eventName=CreateSecurityGroup)||($.eventName=DeleteSecurityGroup)}'),
+            metric_namespace="LogMetrics",
+            metric_name="SecurityGroupChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("SecurityGroupChangesAlarm",
+            metric=sg_changes_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-SecurityGroupChanges",
+            alarm_description="Security group changes CloudWatch alarm (CIS 4.15)"
+        )
+
+        # 13. Network ACL changes (CIS 4.16)
+        nacl_changes_metric = logs.MetricFilter(self, "NACLChangesMetricFilter",
+            log_group=cloudtrail_log_group,
+            filter_pattern=logs.FilterPattern.literal('{($.eventName=CreateNetworkAcl)||($.eventName=CreateNetworkAclEntry)||($.eventName=DeleteNetworkAcl)||($.eventName=DeleteNetworkAclEntry)||($.eventName=ReplaceNetworkAclEntry)||($.eventName=ReplaceNetworkAclAssociation)}'),
+            metric_namespace="LogMetrics",
+            metric_name="NACLChanges",
+            default_value=0,
+            metric_value="1"
+        )
+        _make_alarm("NACLChangesAlarm",
+            metric=nacl_changes_metric.metric(statistic="Sum", period=Duration.minutes(5)),
+            alarm_name="MSB-NACLChanges",
+            alarm_description="Network ACL changes CloudWatch alarm (CIS 4.16)"
+        )
+
         # AWS Config Role using L2 construct
         config_role = iam.Role(self, "ConfigRole",
             role_name=f"msb-config-role-{self.region}",
@@ -373,6 +434,7 @@ class LoggingStack(Stack):
 
         # Export resources for other stacks
         self.logs_bucket = logs_bucket
+        self.access_logs_bucket = access_logs_bucket
         self.notifications_topic = self.notifications_topic
         self.config_role = config_role
         self.cloudtrail_key = cloudtrail_key

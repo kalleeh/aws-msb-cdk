@@ -1,6 +1,7 @@
 from aws_cdk import (
     Stack,
     RemovalPolicy,
+    aws_ec2 as ec2,
     aws_iam as iam,
     aws_logs as logs,
     aws_lambda as lambda_,
@@ -41,10 +42,10 @@ class NetworkSecurityStack(Stack):
         # Grant permissions to the role
         flow_logs_group.grant_write(flow_logs_role)
 
-        return {
-            "role": flow_logs_role,
-            "log_group": flow_logs_group
-        }
+        return ec2.FlowLogDestination.to_cloud_watch_logs(
+            log_group=flow_logs_group,
+            iam_role=flow_logs_role
+        )
 
     def create_default_sg_security(self):
         """Create Lambda function to secure default security groups"""
@@ -56,17 +57,25 @@ class NetworkSecurityStack(Stack):
 import boto3
 import os
 import json
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def handler(event, context):
     ec2 = boto3.client('ec2')
     sns = boto3.client('sns')
     topic_arn = os.environ.get('NOTIFICATION_TOPIC_ARN', '')
-    
-    # Get all VPCs
-    vpcs = ec2.describe_vpcs()
-    
+
+    # Get all VPCs (paginated)
+    paginator = ec2.get_paginator('describe_vpcs')
+    vpcs = []
+    for page in paginator.paginate():
+        vpcs.extend(page['Vpcs'])
+    logger.info(f"Found {len(vpcs)} VPCs to process")
+
     secured_groups = []
-    for vpc in vpcs['Vpcs']:
+    for vpc in vpcs:
         vpc_id = vpc['VpcId']
         
         # Get default security group for this VPC
@@ -102,11 +111,12 @@ def handler(event, context):
                 modified = True
             
             if modified:
+                logger.info(f"Secured default security group {sg_id} in VPC {vpc_id}")
                 secured_groups.append({
                     'vpc_id': vpc_id,
                     'security_group_id': sg_id
                 })
-    
+
     # Send notification if any groups were modified
     if secured_groups and topic_arn:
         message = {
@@ -139,9 +149,7 @@ def handler(event, context):
                     "ec2:DescribeSecurityGroups",
                     "ec2:DescribeVpcs",
                     "ec2:RevokeSecurityGroupIngress",
-                    "ec2:RevokeSecurityGroupEgress",
-                    "ec2:UpdateSecurityGroupRuleDescriptionsIngress",
-                    "ec2:UpdateSecurityGroupRuleDescriptionsEgress"
+                    "ec2:RevokeSecurityGroupEgress"
                 ],
                 resources=["*"]
             )
