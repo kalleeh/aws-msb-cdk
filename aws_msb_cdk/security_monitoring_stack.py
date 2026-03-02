@@ -10,7 +10,9 @@ class SecurityMonitoringStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, notifications_topic=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Store the notifications topic
+        # Accept a topic ARN string for cross-deployment use (regional-only deploys)
+        if isinstance(notifications_topic, str):
+            notifications_topic = sns.Topic.from_topic_arn(self, "ImportedNotificationsTopic", notifications_topic)
         self.notifications_topic = notifications_topic
 
         # Create EventBridge rules for security monitoring

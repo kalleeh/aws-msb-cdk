@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_iam as iam,
 )
 from constructs import Construct
+from cdk_nag import NagSuppressions
 
 class VpcStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, flow_logs_destination=None, **kwargs) -> None:
@@ -103,6 +104,14 @@ class VpcStack(Stack):
             export_name=f"MSB-VpcId-{self.region}"
         )
 
+        # ApplicationSecurityGroup allows HTTPS (443) from 0.0.0.0/0 — this is
+        # intentional for internet-facing web servers. SSH is restricted to the
+        # bastion SG only.
+        NagSuppressions.add_resource_suppressions(
+            app_sg,
+            [{"id": "AwsSolutions-EC23", "reason": "HTTPS inbound from 0.0.0.0/0 is intentional — the application security group is designed for internet-facing web servers. SSH access is restricted to the bastion security group only."}]
+        )
+
         # Export outputs
         self.vpc = vpc
         self.bastion_sg = bastion_sg
@@ -116,6 +125,12 @@ class VpcStack(Stack):
             vpc=vpc,
             description="Security group for VPC endpoints",
             allow_all_outbound=False
+        )
+        # vpc.vpc_cidr_block is an intrinsic CFN token at synth time; CDK Nag
+        # cannot statically evaluate it so it raises a validation failure.
+        NagSuppressions.add_resource_suppressions(
+            endpoint_security_group,
+            [{"id": "CdkNagValidationFailure", "reason": "vpc.vpc_cidr_block is a CloudFormation intrinsic token — CDK Nag cannot statically evaluate it, but the CIDR is scoped to the VPC address space (not 0.0.0.0/0)."}]
         )
 
         # Allow HTTPS from within the VPC

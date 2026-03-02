@@ -11,6 +11,12 @@ class LoggingRegionalStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, logs_bucket, config_role, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Accept strings for cross-deployment use (regional-only deploys)
+        if isinstance(logs_bucket, str):
+            logs_bucket = s3.Bucket.from_bucket_name(self, "ImportedLogsBucket", logs_bucket)
+        if isinstance(config_role, str):
+            config_role = iam.Role.from_role_name(self, "ImportedConfigRole", config_role)
+
         # AWS Config Recorder using L2 construct
         recorder = config.CfnConfigurationRecorder(self, "ConfigRecorder",
             role_arn=config_role.role_arn,

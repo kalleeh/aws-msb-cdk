@@ -14,6 +14,7 @@ from aws_cdk import (
     Duration,
 )
 from constructs import Construct
+from cdk_nag import NagSuppressions
 
 class LoggingStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, notifications_topic=None, **kwargs) -> None:
@@ -401,6 +402,10 @@ class LoggingStack(Stack):
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWS_ConfigRole")
             ]
+        )
+        NagSuppressions.add_resource_suppressions(
+            config_role,
+            [{"id": "AwsSolutions-IAM4", "reason": "AWS_ConfigRole is the required AWS service role managed policy for AWS Config — no customer-managed equivalent exists. AWS Config will not function without this exact managed policy."}]
         )
 
         # Add S3 bucket policy for Config

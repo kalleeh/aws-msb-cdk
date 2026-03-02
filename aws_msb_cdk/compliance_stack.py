@@ -15,6 +15,11 @@ class ComplianceStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, notifications_topic, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Accept a topic ARN string for cross-deployment use (regional-only deploys)
+        if isinstance(notifications_topic, str):
+            from aws_cdk import aws_sns as sns
+            notifications_topic = sns.Topic.from_topic_arn(self, "ImportedNotificationsTopic", notifications_topic)
+
         # Create AWS Config Rules using L2 constructs
         self._create_config_rules()
 

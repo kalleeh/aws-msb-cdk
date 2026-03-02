@@ -93,21 +93,19 @@ if not target or target == "regional":
         # If we're only deploying regional resources or if we're in a non-global region,
         # we need to import the global resources
         if target == "regional" or region != global_region:
-            # Import global resources
-            logs_bucket_name = f"msb-logs-{account_id}-{global_region}"
-            logs_bucket = aws_cdk.aws_s3.Bucket.from_bucket_name(
-                app, f"ImportedLogsBucket-{region}", logs_bucket_name
-            )
-            
-            notifications_topic_name = f"msb-notifications-{global_region}"
-            notifications_topic = aws_cdk.aws_sns.Topic.from_topic_name(
-                app, f"ImportedNotificationsTopic-{region}", notifications_topic_name
-            )
-            
-            config_role_name = f"msb-config-role-{global_region}"
-            config_role = aws_cdk.aws_iam.Role.from_role_name(
-                app, f"ImportedConfigRole-{region}", config_role_name
-            )
+            # Pass raw strings so each stack can import resources locally in its
+            # own scope — sharing an imported construct across stacks causes CDK
+            # to raise a cross-stack EventBridge target error even when the
+            # account/region are the same.
+            logs_bucket = f"msb-logs-{account_id}-{global_region}"
+            config_role = f"msb-config-role-{global_region}"
+            # EventBridge → SNS cross-region targets require explicit event bus
+            # forwarding (not configured here). Only pass the global topic to
+            # stacks in the same region; other regions get None.
+            if region == global_region:
+                notifications_topic = f"arn:aws:sns:{global_region}:{account_id}:msb-notifications-{global_region}"
+            else:
+                notifications_topic = None
         else:
             # Use the resources created in this deployment
             logs_bucket = logging_stack.logs_bucket

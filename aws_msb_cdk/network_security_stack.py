@@ -10,12 +10,16 @@ from aws_cdk import (
     Duration,
 )
 from constructs import Construct
+from cdk_nag import NagSuppressions
 
 class NetworkSecurityStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, notifications_topic=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Store the notifications topic
+        # Accept a topic ARN string for cross-deployment use (regional-only deploys)
+        if isinstance(notifications_topic, str):
+            from aws_cdk import aws_sns as sns
+            notifications_topic = sns.Topic.from_topic_arn(self, "ImportedNotificationsTopic", notifications_topic)
         self.notifications_topic = notifications_topic
 
         # Create VPC Flow Logs destination
@@ -49,8 +53,31 @@ class NetworkSecurityStack(Stack):
 
     def create_default_sg_security(self):
         """Create Lambda function to secure default security groups"""
+        # Custom execution role — avoids AWSLambdaBasicExecutionRole (AwsSolutions-IAM4)
+        function_name = "msb-secure-default-sg"
+        lambda_exec_role = iam.Role(self, "SecureDefaultSGRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            inline_policies={
+                "CloudWatchLogs": iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+                            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/{function_name}:*"]
+                        )
+                    ]
+                )
+            }
+        )
+        NagSuppressions.add_resource_suppressions(
+            lambda_exec_role,
+            [{"id": "AwsSolutions-IAM5", "reason": "Log stream wildcard (:*) is the standard CloudWatch Logs ARN suffix — scopes access to streams within the named log group only."}],
+            apply_to_children=True
+        )
+
         # Create the Lambda function
         secure_default_sg_function = lambda_.Function(self, "SecureDefaultSGFunction",
+            function_name=function_name,
+            role=lambda_exec_role,
             runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=lambda_.Code.from_inline("""
@@ -163,6 +190,20 @@ def handler(event, context):
                     resources=[self.notifications_topic.topic_arn]
                 )
             )
+
+        NagSuppressions.add_resource_suppressions(
+            secure_default_sg_function,
+            [
+                {"id": "AwsSolutions-IAM5", "reason": "EC2 Describe/Revoke APIs require wildcard resources — security group and VPC IDs are not known at deploy time; the Lambda must operate across all VPCs in the region."},
+                {"id": "AwsSolutions-L1", "reason": "Lambda is already configured to use Python 3.13 (latest supported runtime). CDK Nag may not yet recognise python3.13 as the latest."}
+            ],
+            apply_to_children=True
+        )
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/SecureDefaultSGRole/DefaultPolicy/Resource",
+            [{"id": "AwsSolutions-IAM5", "reason": "EC2 Describe/Revoke APIs require wildcard resources — security group and VPC IDs are not known at deploy time."}]
+        )
 
         # Schedule the Lambda to run daily
         events.Rule(self, "SecureDefaultSGSchedule",

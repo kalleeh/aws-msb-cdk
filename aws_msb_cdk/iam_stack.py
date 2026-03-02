@@ -9,6 +9,7 @@ from aws_cdk import (
     CfnResource
 )
 from constructs import Construct
+from cdk_nag import NagSuppressions
 
 class IAMStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, notifications_topic=None, **kwargs) -> None:
@@ -54,13 +55,17 @@ class IAMStack(Stack):
         )
 
         # CIS 1.17 - Ensure a support role has been created to manage incidents with AWS Support
-        iam.Role(self, "AWSSupportRole",
+        support_role = iam.Role(self, "AWSSupportRole",
             role_name="msb-aws-support-role",
             assumed_by=iam.AccountRootPrincipal(),
             description="Role for AWS Support access - CIS 1.17",
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("AWSSupportAccess")
             ]
+        )
+        NagSuppressions.add_resource_suppressions(
+            support_role,
+            [{"id": "AwsSolutions-IAM4", "reason": "AWSSupportAccess is the required AWS managed policy for CIS 1.17 compliance — ensures a support role exists for incident management with AWS Support. No customer-managed equivalent exists for this purpose."}]
         )
         
     def create_iam_policy_checker(self):

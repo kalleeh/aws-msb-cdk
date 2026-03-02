@@ -12,11 +12,17 @@ from aws_cdk import (
     custom_resources as cr,
 )
 from constructs import Construct
+from cdk_nag import NagSuppressions
 
 
 class SecurityRegionalStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, notifications_topic, notification_email=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Accept a topic ARN string for cross-deployment use (regional-only deploys)
+        if isinstance(notifications_topic, str):
+            from aws_cdk import aws_sns as sns
+            notifications_topic = sns.Topic.from_topic_arn(self, "ImportedNotificationsTopic", notifications_topic)
 
         # ------------------------------------------------------------------ #
         # S3 bucket for GuardDuty findings export
@@ -127,6 +133,7 @@ class SecurityRegionalStack(Stack):
         # Amazon Inspector v2 - enable for EC2, ECR, and Lambda
         # ------------------------------------------------------------------ #
         inspector = cr.AwsCustomResource(self, "EnableInspectorV2",
+            install_latest_aws_sdk=False,
             on_create=cr.AwsSdkCall(
                 service="Inspector2",
                 action="enable",
@@ -259,6 +266,38 @@ class SecurityRegionalStack(Stack):
                     )
                 ]
             )
+        )
+
+        # ------------------------------------------------------------------ #
+        # CDK Nag suppressions
+        # ------------------------------------------------------------------ #
+        # Inspector custom resource: Enable/List* require wildcard resources;
+        # iam:CreateServiceLinkedRole is an IAM account-level action.
+        NagSuppressions.add_resource_suppressions(
+            inspector,
+            [{"id": "AwsSolutions-IAM5", "reason": "inspector2:Enable and inspector2:List* are account-level Inspector APIs requiring wildcard resources. iam:CreateServiceLinkedRole requires wildcard as the linked role may not exist yet."}],
+            apply_to_children=True
+        )
+        # CDK provider framework Lambda (hash ID) — runtime and role are managed
+        # by CDK internally and cannot be changed by the customer.
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/AWS679f53fac002430cb0da5b7982bd2287/ServiceRole/Resource",
+            [{"id": "AwsSolutions-IAM4", "reason": "CDK provider framework Lambda — AWSLambdaBasicExecutionRole is attached by CDK internally; this Lambda is not customer-managed code."}]
+        )
+        NagSuppressions.add_resource_suppressions_by_path(
+            self,
+            f"/{self.stack_name}/AWS679f53fac002430cb0da5b7982bd2287/Resource",
+            [{"id": "AwsSolutions-L1", "reason": "CDK provider framework Lambda — runtime version is managed by CDK internally and cannot be overridden by the customer."}]
+        )
+        # GuardDuty findings bucket: server access logs are not required for a
+        # security-findings archive; enabling them would require a separate access
+        # logs bucket per region, adding operational overhead with no security benefit
+        # for this purpose (the bucket itself is already encrypted, versioned, and
+        # blocked from public access).
+        NagSuppressions.add_resource_suppressions(
+            findings_bucket,
+            [{"id": "AwsSolutions-S1", "reason": "GuardDuty findings bucket does not require server access logs — it is a security archive, not a general-purpose bucket, and is already encrypted, versioned, and blocked from public access."}]
         )
 
         # ------------------------------------------------------------------ #
