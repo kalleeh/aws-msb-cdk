@@ -22,6 +22,37 @@ The project is organized into specialized stacks:
 - **KMS Stack**: Key management and encryption controls
 - **Compliance Stack**: Aggregates all security controls
 
+## Optional Features
+
+### WAFv2 Web Application Firewall
+
+The WAF stack is optional because WAF rules are application-specific and incur additional cost. When enabled, it deploys a REGIONAL WAFv2 WebACL with five AWS managed rule groups:
+
+- **AWSManagedRulesCommonRuleSet** — OWASP Top 10 core protections
+- **AWSManagedRulesKnownBadInputsRuleSet** — known bad inputs (Log4j, SSRF, etc.)
+- **AWSManagedRulesAmazonIpReputationList** — known malicious IPs
+- **AWSManagedRulesAnonymousIpList** — Tor, VPN, and proxy blocking
+- **AWSManagedRulesSQLiRuleSet** — SQL injection protection
+- **Rate limiting rule** — blocks IPs that exceed 2000 requests per 5 minutes
+
+To deploy the WAF stack alongside the other regional stacks:
+
+```
+cdk deploy MSB-WAF-us-east-1 --context notification_email=your@email.com --context enable_waf=true
+```
+
+After deployment, associate the exported `MSB-WAF-WebACLArn-{region}` CloudFormation output with your resources:
+
+```bash
+# Associate with an Application Load Balancer
+aws wafv2 associate-web-acl \
+  --web-acl-arn <WebACLArn> \
+  --resource-arn <alb-arn> \
+  --region <region>
+```
+
+For CloudFront distributions, set the `web_acl_id` property on the distribution (note: CloudFront requires a CLOUDFRONT-scoped WebACL in us-east-1). For API Gateway, associate via the stage settings in the console or CLI.
+
 ## Getting Started
 
 ### Prerequisites

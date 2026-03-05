@@ -12,6 +12,8 @@ from aws_msb_cdk.kms_stack import KMSStack
 from aws_msb_cdk.network_security_stack import NetworkSecurityStack
 from aws_msb_cdk.compliance_stack import ComplianceStack
 from aws_msb_cdk.security_monitoring_stack import SecurityMonitoringStack
+from aws_msb_cdk.notifications_regional_stack import NotificationsRegionalStack
+from aws_msb_cdk.waf_stack import WafStack
 
 app = App()
 from cdk_nag import AwsSolutionsChecks
@@ -45,15 +47,11 @@ if not target or target == "global":
     global_env = Environment(account=account_id, region=global_region)
     
     print(f"Deploying global resources in {global_region}")
-    
-    # IAM Stack with password policy
-    iam_stack = IAMStack(app, "MSB-IAM-Global", env=global_env, termination_protection=True)
 
     # KMS Stack (needs to be created early for encryption keys)
     kms_stack = KMSStack(app, "MSB-KMS-Global", env=global_env, termination_protection=True)
 
-    # Global stacks — correct order:
-    # LoggingStack first — it creates the SNS topic and its own secure log bucket (fallback path)
+    # LoggingStack — creates the SNS topic and its own secure log bucket
     logging_stack = LoggingStack(app, "MSB-Logging-Global",
         notification_email=notification_email,
         kms_stack=kms_stack,
@@ -63,6 +61,14 @@ if not target or target == "global":
 
     # KMSStack can store the topic reference (doesn't use it at construction time)
     kms_stack.notifications_topic = logging_stack.notifications_topic
+
+    # IAM Stack — created after LoggingStack so the notifications topic is available
+    iam_stack = IAMStack(app, "MSB-IAM-Global",
+        notifications_topic=logging_stack.notifications_topic,
+        notification_email=notification_email,
+        env=global_env,
+        termination_protection=True
+    )
 
     # S3SecurityStack now gets the real topic from the start
     s3_security_stack = S3SecurityStack(app, "MSB-S3-Security",
@@ -99,18 +105,26 @@ if not target or target == "regional":
             # account/region are the same.
             logs_bucket = f"msb-logs-{account_id}-{global_region}"
             config_role = f"msb-config-role-{global_region}"
-            # EventBridge → SNS cross-region targets require explicit event bus
-            # forwarding (not configured here). Only pass the global topic to
-            # stacks in the same region; other regions get None.
-            if region == global_region:
-                notifications_topic = f"arn:aws:sns:{global_region}:{account_id}:msb-notifications-{global_region}"
-            else:
-                notifications_topic = None
         else:
             # Use the resources created in this deployment
             logs_bucket = logging_stack.logs_bucket
-            notifications_topic = logging_stack.notifications_topic
             config_role = logging_stack.config_role
+
+        # Every deployed region gets its own SNS notifications topic so that
+        # EventBridge rules in that region have a same-region delivery target.
+        # (EventBridge → SNS cross-region targets are not supported.)
+        if target == "regional" or region != global_region:
+            # Create a dedicated regional notifications topic
+            notifications_regional_stack = NotificationsRegionalStack(
+                app, f"MSB-Notifications-Regional-{region}",
+                notification_email=notification_email,
+                env=regional_env,
+                termination_protection=True,
+            )
+            notifications_topic = notifications_regional_stack.notifications_topic
+        else:
+            # Global region in a combined deploy — reuse the topic from LoggingStack
+            notifications_topic = logging_stack.notifications_topic
 
         # Network Security Stack
         network_security_stack = NetworkSecurityStack(app, f"MSB-Network-Security-{region}",
@@ -149,5 +163,13 @@ if not target or target == "regional":
             notifications_topic=notifications_topic,
             env=regional_env
         )
+
+        # Optional WAF Stack - enable with --context enable_waf=true
+        enable_waf = app.node.try_get_context("enable_waf")
+        if enable_waf and str(enable_waf).lower() == "true":
+            waf_stack = WafStack(app, f"MSB-WAF-{region}",
+                notifications_topic=notifications_topic,
+                env=regional_env
+            )
 
 app.synth()
