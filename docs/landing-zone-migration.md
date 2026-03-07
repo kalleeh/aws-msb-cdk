@@ -24,21 +24,23 @@ These are concrete triggers, not vague guidance. If two or more apply, it is tim
 
 ---
 
-## What carries over automatically
+## What carries over and what needs cleanup
 
-These MSB components migrate to a Landing Zone architecture without being rebuilt — they just get promoted to Organisation-level equivalents.
+These MSB components interact with Control Tower during enrollment. Understanding what happens to each one avoids surprises.
 
-**GuardDuty.** Enable GuardDuty as an Organisation delegated admin from the management or Security account. Existing detector configurations and findings history in the original account stay intact. New accounts added to the Organisation automatically get GuardDuty enabled with the same protection plan settings. MSB's protection plan configuration (S3, EBS malware, runtime monitoring, RDS login events, Lambda network logs) carries over as the Organisation default.
+**GuardDuty.** Control Tower makes the Audit account the GuardDuty Organisation admin. Your existing MSB detector becomes a member detector managed from the Audit account. The `CfnDetector` CloudFormation resource is removed in step 4 (pre-enrollment cleanup); Control Tower recreates the detector under its own management. Existing findings history stays intact. MSB's protection plan configuration (S3, EBS malware, runtime monitoring, RDS login events, Lambda network logs) should be set as the Organisation default from the Audit account after enrollment.
 
-**Security Hub.** Same pattern. Designate a Security Hub administrator account, and findings from all member accounts aggregate into a single view. The FSBP v1.0.0 and CIS v3.0.0 standards MSB enables become the Organisation standard. MSB's automation rules (suppressing Account.1, root MFA hardware controls) can be promoted to Organisation-wide automation rules.
+**Security Hub.** Same pattern as GuardDuty. The Audit account becomes the Security Hub administrator. Your existing hub becomes a member. Removed in pre-enrollment cleanup; Control Tower recreates it. MSB's automation rules (suppressing Account.1, root MFA hardware controls) can be promoted to Organisation-wide automation rules from the Audit account.
 
-**CloudTrail.** Replace the per-account trail (`msb-cloudtrail`) with an Organisation Trail created from the management account. One Organisation Trail covers all current and future accounts automatically — no need to deploy the `LoggingStack` trail into each new account. The central S3 logs bucket (`msb-logs-{account}-{region}`) becomes the Organisation-wide log archive; redirect the Organisation Trail to a dedicated log archive account bucket.
+**CloudTrail.** Control Tower creates an Organisation Trail covering all member accounts. MSB's per-account `msb-cloudtrail` trail is removed in pre-enrollment cleanup. Your existing CloudTrail logs in `msb-logs-{account}-{region}` stay in S3 for historical reference. The `LoggingStack` CloudWatch metric filters and alarms remain active, now attaching to Control Tower's trail log group via the `cloudtrail_log_group_name` context variable.
 
-**AWS Config.** Replace per-account Config recorders with an Organisation Config aggregator. Config rules can be promoted to Organisation conformance packs, which deploy automatically to all member accounts. MSB's ~30 managed rules (`ComplianceStack`) become the baseline conformance pack.
+**AWS Config.** Control Tower deploys a Config recorder and delivery channel into each enrolled account. MSB's versions are removed in pre-enrollment cleanup. After enrollment, MSB's `ComplianceStack` (~30 Config rules) is redeployed with `control_tower_managed=true` and sits on top of the CT-managed recorder — the rules work independently of who created the recorder.
 
-**KMS keys.** The five CMKs created by `KMSStack` (master, CloudTrail, S3, RDS, EBS) stay in the originating account. Cross-account access can be granted via key policy if other accounts need to read encrypted data (e.g., cross-account RDS snapshots, S3 replication). There is no automatic migration needed.
+**KMS keys.** The five CMKs created by `KMSStack` (master, CloudTrail, S3, RDS, EBS) are not touched by Control Tower and require no migration. Cross-account access can be granted via key policy if other accounts need to read encrypted data.
 
-**SNS alerting.** The per-region SNS topics created by `LoggingStack` and `NotificationsRegionalStack` continue working in the original account. In a multi-account setup, you typically add Security Hub finding aggregation and route critical findings through a central Security account SNS topic, while keeping the per-account topics for account-specific operational alerts.
+**SNS alerting.** The per-region SNS topics are not touched by Control Tower and continue working. In a multi-account setup, you can additionally route critical Security Hub findings through a central Security account SNS topic for aggregated visibility, while keeping per-account topics for account-specific operational alerts.
+
+**Inspector and Macie.** Control Tower can enable these at the Organisation level from the Audit account. MSB's versions are removed in pre-enrollment cleanup; Control Tower manages them after enrollment. MSB's EventBridge rules routing findings to SNS remain active in CT mode.
 
 ---
 
@@ -52,7 +54,7 @@ These components do not have a direct lift-and-shift path. They need to be repla
 
 **Per-account Config rules.** MSB's `ComplianceStack` deploys ~30 managed Config rules directly into each account. In an Organisation, these are replaced by Organisation Config conformance packs deployed from the management or delegated admin account. Individual account Config recorders remain active, but the rules are managed centrally.
 
-**MSB CDK stacks.** The MSB stacks themselves need to be deployed into each new account as it is created. This should be automated via a pipeline — CodePipeline with CloudFormation StackSets, or GitHub Actions with OIDC federation. You should not be running `cdk deploy` manually into each account. Account vending (creating new accounts with baseline controls pre-applied) is a core Control Tower feature; MSB becomes the customisation layer applied on top of Control Tower's baseline via Control Tower Account Factory Customization (AFC) or a post-creation hook.
+**MSB CDK stacks.** The MSB stacks need to be deployed into each new account as it is created, always with `--context control_tower_managed=true` in a CT-managed Organisation. Automate this with a GitHub Actions workflow using OIDC federation, or CodePipeline with cross-account roles — running `cdk deploy` manually into each account does not scale. For account vending, Control Tower's Customizations for Control Tower (CfCT) solution or Account Factory Customization (AFC) can trigger the MSB pipeline automatically when a new account is created; CfCT is the more established option for CDK-based customisations. For small organisations (under ~20 accounts), a GitHub Actions workflow triggered manually or by an account creation event is simpler and sufficient.
 
 ---
 
@@ -60,26 +62,61 @@ These components do not have a direct lift-and-shift path. They need to be repla
 
 This is a sequential process. Do not skip steps.
 
-**1. Create an AWS Organisation and enable all features.**
-From your existing AWS account (which becomes the management account), go to AWS Organizations and create an Organisation. Enable all features, not just consolidated billing. This unlocks SCPs, trusted access for services, and delegated admin accounts.
+**1. Create a new AWS account to serve as the Management account.**
+Do not convert your existing MSB account into the management account. AWS explicitly recommends against running workloads in the management account — it is a billing root and SCP anchor, not a place for production infrastructure. Create a fresh AWS account. This account will own the Organisation, Control Tower, and billing. Your existing MSB account will become a member account (your production workload account).
 
-**2. Create a dedicated Security/Audit account.**
-Do not use the management account for security tooling. Create a Security account (also called an Audit account) as a member of the Organisation. This account will become the GuardDuty administrator, Security Hub administrator, and the destination for your central CloudTrail log archive. The original MSB account (your existing production account) can remain as-is while you set up the structure around it.
+**2. Enable AWS Organizations from the new management account and invite the existing MSB account.**
+From the new management account, create an Organisation with all features enabled (not just consolidated billing). Send a join invitation to your existing MSB account. Accept it from the MSB account. The existing account is now a member of the Organisation with all its resources intact.
 
-**3. Enable Control Tower.**
-Enable Control Tower from the management account. Control Tower will set up Landing Zone, create a Log Archive account, enroll your existing accounts where possible, and deploy baseline SCPs. It will detect existing GuardDuty and Security Hub configurations and prompt you to adopt them. Follow the Control Tower console through this process — it handles most of the Organisation-level enablement automatically.
+**3. Enable Control Tower from the management account.**
+Control Tower sets up Landing Zone, creates a Log Archive account and an Audit account, and deploys baseline SCPs. During setup it will detect existing GuardDuty and Security Hub configurations in member accounts and prompt you to adopt them at the Organisation level. Follow the Control Tower console — it handles most of the Organisation-level enablement automatically.
 
-**4. Deploy MSB into each new account as you create them.**
-When you create dev and prod accounts through Control Tower Account Factory, deploy MSB via your pipeline immediately after provisioning. New accounts get the full security baseline (GuardDuty detector, Security Hub standards, Config recorder, CloudWatch alarms, KMS keys) automatically. The Organisation-level GuardDuty and Security Hub will pick up these accounts as members automatically once enrolled.
+**4. Enroll the existing MSB account in Control Tower.**
+This is where MSB's pre-existing security resources require careful handling. Control Tower's enrollment process deploys a StackSet into the account that creates a Config recorder, delivery channel, GuardDuty detector, and Security Hub hub. If MSB's versions of these already exist, the enrollment StackSet will fail.
 
-**5. Replace IAM users with Identity Center permission sets.**
+Before enrolling the existing account, remove the conflicting MSB stacks:
+
+```bash
+# Run from your existing MSB account with appropriate credentials
+
+# Remove the stacks that will hard-conflict with Control Tower's enrollment
+cdk destroy MSB-Security-Regional-us-east-1   # GuardDuty, Security Hub, Inspector, Macie
+cdk destroy MSB-Logging-Regional-us-east-1    # Config recorder + delivery channel
+cdk destroy MSB-Logging-Global                # CloudTrail trail
+```
+
+> **What you are NOT destroying:** KMS keys, SNS topics, CloudWatch alarms and metric filters, Lambda remediators, VPC, Config rules, IAM stack. These have no conflict with Control Tower and will remain active throughout.
+
+After the conflicting stacks are removed, enroll the account through the Control Tower console (Account Factory → Enroll account). Control Tower will recreate the removed resources under its own management.
+
+**5. Redeploy MSB with `control_tower_managed=true`.**
+Once enrollment completes, redeploy MSB into the account. The `control_tower_managed=true` flag tells MSB to skip the resources Control Tower now owns and only deploy its unique-value components:
+
+```bash
+cdk deploy --all \
+  --context notification_email=your@company.com \
+  --context control_tower_managed=true
+```
+
+This restores the CloudWatch alarms, Lambda remediators, Config rules, KMS keys, SNS regional topics, and VPC — everything that Control Tower does not automatically provide. If your Control Tower Organisation Trail uses a different CloudWatch Logs group name than the default (`aws-controltower/CloudTrailLogs`), pass it explicitly:
+
+```bash
+  --context cloudtrail_log_group_name=/your/ct/trail/log-group
+```
+
+**6. Deploy MSB into each new account as you create them.**
+When you create dev, staging, or additional prod accounts through Control Tower Account Factory, deploy MSB immediately after provisioning using the `control_tower_managed=true` flag. New accounts get CT's baseline (GuardDuty, Security Hub, Config) from the Organisation, plus MSB's unique-value layer on top (CloudWatch alarms, Lambda remediators, Config rules, SNS alerting, KMS keys).
+
+For more than a handful of accounts, automate this with a GitHub Actions workflow or CodePipeline triggered by account creation. Running `cdk deploy` manually into each account does not scale.
+
+**7. Replace IAM users with Identity Center permission sets.**
 Set up IAM Identity Center in the management account. Connect it to your identity provider or use the built-in directory. Create permission sets that mirror the access patterns your team currently has (read-only, developer, admin). Migrate engineers one at a time by creating their Identity Center assignment, confirming SSO access works, then removing their IAM user. MSB's IAM policy checker Lambda (`IAMStack`) can remain active during the transition as a safety net.
 
-**6. Set up SCPs for baseline guardrails.**
-Control Tower deploys a set of mandatory and strongly recommended SCPs. Add your own for any controls MSB cannot enforce at the account level: denying specific high-risk regions, preventing CloudTrail from being disabled, requiring MFA for sensitive API calls. SCPs in the Organisation enforce these guarantees regardless of account-level IAM configuration.
+**8. Set up SCPs for baseline guardrails.**
+Control Tower deploys a set of mandatory and strongly recommended SCPs. Add your own for controls MSB cannot enforce at the account level: denying specific high-risk regions, preventing CloudTrail from being disabled, requiring MFA for sensitive API calls. SCPs enforce these guarantees regardless of account-level IAM configuration.
 
-**7. Decommission the single-account VPC in favour of shared networking.**
-Once workloads have migrated to the multi-account structure and Transit Gateway (or equivalent) is in place, remove the MSB VPC stack from the original account. Migrating workloads off the standalone VPC is the most time-consuming part of the overall Landing Zone migration — plan for it to take weeks, not days.
+**9. Decommission the single-account VPC in favour of shared networking.**
+Once workloads have migrated to the multi-account structure and Transit Gateway (or equivalent) is in place, remove the MSB VPC stack from the original account. Migrating workloads off the standalone VPC is the most time-consuming part of the overall migration — plan for weeks, not days.
 
 ---
 
