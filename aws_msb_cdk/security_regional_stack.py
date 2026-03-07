@@ -16,7 +16,7 @@ from cdk_nag import NagSuppressions
 
 
 class SecurityRegionalStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, notifications_topic, notification_email=None, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, notifications_topic, notification_email=None, control_tower_managed=False, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Accept a topic ARN string for cross-deployment use (regional-only deploys)
@@ -76,122 +76,133 @@ class SecurityRegionalStack(Stack):
         )
 
         # ------------------------------------------------------------------ #
-        # GuardDuty Detector - all protection plan features enabled
+        # GuardDuty, Security Hub, Inspector, Macie
+        # Skipped when control_tower_managed=True — CT enables and manages
+        # these at the Organisation level; creating them here would conflict.
         # ------------------------------------------------------------------ #
-        detector = guardduty.CfnDetector(self, "GuardDutyDetector",
-            enable=True,
-            finding_publishing_frequency="FIFTEEN_MINUTES",
-            features=[
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="S3_DATA_EVENTS",
-                    status="ENABLED"
-                ),
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="EKS_AUDIT_LOGS",
-                    status="ENABLED"
-                ),
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="EBS_MALWARE_PROTECTION",
-                    status="ENABLED",
-                    additional_configuration=[
-                        guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
-                            name="EC2_AGENT_MANAGEMENT",
-                            status="ENABLED"
-                        )
-                    ]
-                ),
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="RDS_LOGIN_EVENTS",
-                    status="ENABLED"
-                ),
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="LAMBDA_NETWORK_LOGS",
-                    status="ENABLED"
-                ),
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="EKS_RUNTIME_MONITORING",
-                    status="ENABLED",
-                    additional_configuration=[
-                        guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
-                            name="EKS_ADDON_MANAGEMENT",
-                            status="ENABLED"
-                        )
-                    ]
-                ),
-                guardduty.CfnDetector.CFNFeatureConfigurationProperty(
-                    name="RUNTIME_MONITORING",
-                    status="ENABLED",
-                    additional_configuration=[
-                        guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
-                            name="EC2_AGENT_MANAGEMENT",
-                            status="ENABLED"
-                        ),
-                        guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
-                            name="EKS_ADDON_MANAGEMENT",
-                            status="ENABLED"
-                        ),
-                        guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
-                            name="FARGATE_AGENT_MANAGEMENT",
-                            status="ENABLED"
-                        ),
-                    ]
-                ),
-            ]
-        )
+        detector = security_hub = inspector = macie_session = None
 
-        # ------------------------------------------------------------------ #
-        # Security Hub - enable hub then activate FSBP v1.0.0 + CIS v3.0.0
-        # CfnStandard is a native L1 construct — no custom resource needed
-        # ------------------------------------------------------------------ #
-        security_hub = securityhub.CfnHub(self, "SecurityHub")
+        if not control_tower_managed:
+            detector = guardduty.CfnDetector(self, "GuardDutyDetector",
+                enable=True,
+                finding_publishing_frequency="FIFTEEN_MINUTES",
+                features=[
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="S3_DATA_EVENTS",
+                        status="ENABLED"
+                    ),
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="EKS_AUDIT_LOGS",
+                        status="ENABLED"
+                    ),
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="EBS_MALWARE_PROTECTION",
+                        status="ENABLED",
+                        additional_configuration=[
+                            guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
+                                name="EC2_AGENT_MANAGEMENT",
+                                status="ENABLED"
+                            )
+                        ]
+                    ),
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="RDS_LOGIN_EVENTS",
+                        status="ENABLED"
+                    ),
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="LAMBDA_NETWORK_LOGS",
+                        status="ENABLED"
+                    ),
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="EKS_RUNTIME_MONITORING",
+                        status="ENABLED",
+                        additional_configuration=[
+                            guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
+                                name="EKS_ADDON_MANAGEMENT",
+                                status="ENABLED"
+                            )
+                        ]
+                    ),
+                    guardduty.CfnDetector.CFNFeatureConfigurationProperty(
+                        name="RUNTIME_MONITORING",
+                        status="ENABLED",
+                        additional_configuration=[
+                            guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
+                                name="EC2_AGENT_MANAGEMENT",
+                                status="ENABLED"
+                            ),
+                            guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
+                                name="EKS_ADDON_MANAGEMENT",
+                                status="ENABLED"
+                            ),
+                            guardduty.CfnDetector.CFNFeatureAdditionalConfigurationProperty(
+                                name="FARGATE_AGENT_MANAGEMENT",
+                                status="ENABLED"
+                            ),
+                        ]
+                    ),
+                ]
+            )
 
-        fsbp_standard = securityhub.CfnStandard(self, "FBSPStandard",
-            standards_arn=f"arn:aws:securityhub:{self.region}::standards/aws-foundational-security-best-practices/v/1.0.0"
-        )
-        fsbp_standard.node.add_dependency(security_hub)
+            security_hub = securityhub.CfnHub(self, "SecurityHub")
 
-        cis_standard = securityhub.CfnStandard(self, "CISv3Standard",
-            standards_arn=f"arn:aws:securityhub:{self.region}::standards/cis-aws-foundations-benchmark/v/3.0.0"
-        )
-        cis_standard.node.add_dependency(security_hub)
+            fsbp_standard = securityhub.CfnStandard(self, "FBSPStandard",
+                standards_arn=f"arn:aws:securityhub:{self.region}::standards/aws-foundational-security-best-practices/v/1.0.0"
+            )
+            fsbp_standard.node.add_dependency(security_hub)
 
-        # ------------------------------------------------------------------ #
-        # Amazon Inspector v2 - enable for EC2, ECR, and Lambda
-        # ------------------------------------------------------------------ #
-        inspector = cr.AwsCustomResource(self, "EnableInspectorV2",
-            install_latest_aws_sdk=False,
-            on_create=cr.AwsSdkCall(
-                service="Inspector2",
-                action="enable",
-                parameters={
-                    "resourceTypes": ["EC2", "ECR", "LAMBDA"]
-                },
-                physical_resource_id=cr.PhysicalResourceId.of(
-                    f"InspectorV2Enable-{self.region}"
-                )
-            ),
-            policy=cr.AwsCustomResourcePolicy.from_statements([
-                iam.PolicyStatement(
-                    actions=[
-                        "inspector2:Enable",
-                        "inspector2:List*",
-                        "iam:CreateServiceLinkedRole",
-                    ],
-                    resources=["*"]
-                )
-            ])
-        )
+            cis_standard = securityhub.CfnStandard(self, "CISv3Standard",
+                standards_arn=f"arn:aws:securityhub:{self.region}::standards/cis-aws-foundations-benchmark/v/3.0.0"
+            )
+            cis_standard.node.add_dependency(security_hub)
 
-        # ------------------------------------------------------------------ #
-        # Amazon Macie - enable session
-        # ------------------------------------------------------------------ #
-        macie_session = macie.CfnSession(self, "MacieSession",
-            finding_publishing_frequency="FIFTEEN_MINUTES",
-            status="ENABLED"
-        )
+            inspector = cr.AwsCustomResource(self, "EnableInspectorV2",
+                install_latest_aws_sdk=False,
+                on_create=cr.AwsSdkCall(
+                    service="Inspector2",
+                    action="enable",
+                    parameters={"resourceTypes": ["EC2", "ECR", "LAMBDA"]},
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"InspectorV2Enable-{self.region}"
+                    )
+                ),
+                policy=cr.AwsCustomResourcePolicy.from_statements([
+                    iam.PolicyStatement(
+                        actions=[
+                            "inspector2:Enable",
+                            "inspector2:List*",
+                            "iam:CreateServiceLinkedRole",
+                        ],
+                        resources=["*"]
+                    )
+                ])
+            )
+
+            macie_session = macie.CfnSession(self, "MacieSession",
+                finding_publishing_frequency="FIFTEEN_MINUTES",
+                status="ENABLED"
+            )
+
+            # CDK Nag suppressions (only needed when resources above are created)
+            NagSuppressions.add_resource_suppressions(
+                inspector,
+                [{"id": "AwsSolutions-IAM5", "reason": "inspector2:Enable and inspector2:List* are account-level Inspector APIs requiring wildcard resources. iam:CreateServiceLinkedRole requires wildcard as the linked role may not exist yet."}],
+                apply_to_children=True
+            )
+            NagSuppressions.add_resource_suppressions_by_path(
+                self,
+                f"/{self.stack_name}/AWS679f53fac002430cb0da5b7982bd2287/ServiceRole/Resource",
+                [{"id": "AwsSolutions-IAM4", "reason": "CDK provider framework Lambda — AWSLambdaBasicExecutionRole is attached by CDK internally; this Lambda is not customer-managed code."}]
+            )
+            NagSuppressions.add_resource_suppressions_by_path(
+                self,
+                f"/{self.stack_name}/AWS679f53fac002430cb0da5b7982bd2287/Resource",
+                [{"id": "AwsSolutions-L1", "reason": "CDK provider framework Lambda — runtime version is managed by CDK internally and cannot be overridden by the customer."}]
+            )
 
         # ------------------------------------------------------------------ #
         # EventBridge rules to route security findings to SNS notifications
+        # (kept in CT mode — findings still flow even when CT manages the services)
         # ------------------------------------------------------------------ #
         if notifications_topic:
             # Inspector v2 findings → SNS
@@ -294,32 +305,6 @@ class SecurityRegionalStack(Stack):
             )
         )
 
-        # ------------------------------------------------------------------ #
-        # CDK Nag suppressions
-        # ------------------------------------------------------------------ #
-        # Inspector custom resource: Enable/List* require wildcard resources;
-        # iam:CreateServiceLinkedRole is an IAM account-level action.
-        NagSuppressions.add_resource_suppressions(
-            inspector,
-            [{"id": "AwsSolutions-IAM5", "reason": "inspector2:Enable and inspector2:List* are account-level Inspector APIs requiring wildcard resources. iam:CreateServiceLinkedRole requires wildcard as the linked role may not exist yet."}],
-            apply_to_children=True
-        )
-        # CDK provider framework Lambda (hash ID) — runtime and role are managed
-        # by CDK internally and cannot be changed by the customer.
-        NagSuppressions.add_resource_suppressions_by_path(
-            self,
-            f"/{self.stack_name}/AWS679f53fac002430cb0da5b7982bd2287/ServiceRole/Resource",
-            [{"id": "AwsSolutions-IAM4", "reason": "CDK provider framework Lambda — AWSLambdaBasicExecutionRole is attached by CDK internally; this Lambda is not customer-managed code."}]
-        )
-        NagSuppressions.add_resource_suppressions_by_path(
-            self,
-            f"/{self.stack_name}/AWS679f53fac002430cb0da5b7982bd2287/Resource",
-            [{"id": "AwsSolutions-L1", "reason": "CDK provider framework Lambda — runtime version is managed by CDK internally and cannot be overridden by the customer."}]
-        )
-        # GuardDuty findings bucket: server access logs are not required for a
-        # security-findings archive; enabling them would require a separate access
-        # logs bucket per region, adding operational overhead with no security benefit
-        # for this purpose (the bucket itself is already encrypted, versioned, and
         # ------------------------------------------------------------------ #
         # Exports
         # ------------------------------------------------------------------ #

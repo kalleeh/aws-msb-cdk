@@ -4,6 +4,7 @@
     "notification_email": "",
     "security_contact_phone": "",
     "enable_object_lock": false,
+    "control_tower_managed": false,
     "global_region": "us-east-1",
     "target_regions": ["us-east-1", "us-west-2"],
     "enable_waf": false,

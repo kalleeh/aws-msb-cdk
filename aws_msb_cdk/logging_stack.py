@@ -17,7 +17,7 @@ from constructs import Construct
 from cdk_nag import NagSuppressions
 
 class LoggingStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, notifications_topic=None, enable_object_lock=False, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, notifications_topic=None, enable_object_lock=False, control_tower_managed=False, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # S3 Bucket for Logs using secure bucket configuration if available
@@ -148,79 +148,85 @@ class LoggingStack(Stack):
             cfn_topic.lambda_failure_feedback_role_arn = feedback_role.role_arn
             cfn_topic.lambda_success_feedback_sample_rate = 100
 
-        # Get KMS key for CloudTrail encryption if available
-        cloudtrail_key = None
-        if kms_stack and hasattr(kms_stack, 'cloudtrail_key'):
-            cloudtrail_key = kms_stack.cloudtrail_key
-        else:
-            # Create a new KMS key for CloudTrail if not provided
-            cloudtrail_key = kms.Key(self, "CloudTrailKey",
-                alias=f"alias/msb-cloudtrail-key-{self.region}",
-                description="KMS key for CloudTrail encryption",
-                enable_key_rotation=True,
-                removal_policy=RemovalPolicy.RETAIN
-            )
-
-            # Add CloudTrail service principal to key policy
-            cloudtrail_key.add_to_resource_policy(
-                iam.PolicyStatement(
-                    sid="AllowCloudTrailToEncryptLogs",
-                    actions=["kms:GenerateDataKey*", "kms:DescribeKey"],
-                    principals=[iam.ServicePrincipal("cloudtrail.amazonaws.com")],
-                    resources=["*"],
-                    conditions={
-                        "StringLike": {
-                            "kms:EncryptionContext:aws:cloudtrail:arn": f"arn:aws:cloudtrail:*:{self.account}:trail/*"
-                        }
-                    }
+        if not control_tower_managed:
+            # Get KMS key for CloudTrail encryption if available
+            cloudtrail_key = None
+            if kms_stack and hasattr(kms_stack, 'cloudtrail_key'):
+                cloudtrail_key = kms_stack.cloudtrail_key
+            else:
+                cloudtrail_key = kms.Key(self, "CloudTrailKey",
+                    alias=f"alias/msb-cloudtrail-key-{self.region}",
+                    description="KMS key for CloudTrail encryption",
+                    enable_key_rotation=True,
+                    removal_policy=RemovalPolicy.RETAIN
                 )
+                cloudtrail_key.add_to_resource_policy(
+                    iam.PolicyStatement(
+                        sid="AllowCloudTrailToEncryptLogs",
+                        actions=["kms:GenerateDataKey*", "kms:DescribeKey"],
+                        principals=[iam.ServicePrincipal("cloudtrail.amazonaws.com")],
+                        resources=["*"],
+                        conditions={
+                            "StringLike": {
+                                "kms:EncryptionContext:aws:cloudtrail:arn": f"arn:aws:cloudtrail:*:{self.account}:trail/*"
+                            }
+                        }
+                    )
+                )
+
+            # CloudTrail using L2 construct with KMS encryption
+            trail = cloudtrail.Trail(self, "CloudTrail",
+                bucket=logs_bucket,
+                send_to_cloud_watch_logs=True,
+                cloud_watch_logs_retention=logs.RetentionDays.ONE_YEAR,
+                is_multi_region_trail=True,
+                include_global_service_events=True,
+                enable_file_validation=True,
+                management_events=cloudtrail.ReadWriteType.ALL,
+                trail_name="msb-cloudtrail",
+                encryption_key=cloudtrail_key
             )
+            trail.add_s3_event_selector(
+                [cloudtrail.S3EventSelector(bucket=logs_bucket)],
+                include_management_events=True,
+                read_write_type=cloudtrail.ReadWriteType.ALL
+            )
+            cfn_trail = trail.node.default_child
+            cfn_trail.add_property_override("AdvancedEventSelectors", [
+                {
+                    "Name": "All S3 data events",
+                    "FieldSelectors": [
+                        {"Field": "eventCategory", "Equals": ["Data"]},
+                        {"Field": "resources.type", "Equals": ["AWS::S3::Object"]}
+                    ]
+                },
+                {
+                    "Name": "All Lambda data events",
+                    "FieldSelectors": [
+                        {"Field": "eventCategory", "Equals": ["Data"]},
+                        {"Field": "resources.type", "Equals": ["AWS::Lambda::Function"]}
+                    ]
+                }
+            ])
 
-        # CloudTrail using L2 construct with KMS encryption
-        trail = cloudtrail.Trail(self, "CloudTrail",
-            bucket=logs_bucket,
-            send_to_cloud_watch_logs=True,
-            cloud_watch_logs_retention=logs.RetentionDays.ONE_YEAR,
-            is_multi_region_trail=True,
-            include_global_service_events=True,
-            enable_file_validation=True,
-            management_events=cloudtrail.ReadWriteType.ALL,
-            trail_name="msb-cloudtrail",
-            encryption_key=cloudtrail_key
-        )
-
-        # Enable data events for the logs bucket via L2
-        trail.add_s3_event_selector(
-            [cloudtrail.S3EventSelector(bucket=logs_bucket)],
-            include_management_events=True,
-            read_write_type=cloudtrail.ReadWriteType.ALL
-        )
-
-        # Add advanced event selectors for ALL S3 buckets and ALL Lambda functions
-        # using the escape hatch since CDK L2 doesn't support wildcard selectors (CIS 3.10, 3.11)
-        cfn_trail = trail.node.default_child
-        cfn_trail.add_property_override("AdvancedEventSelectors", [
-            {
-                "Name": "All S3 data events",
-                "FieldSelectors": [
-                    {"Field": "eventCategory", "Equals": ["Data"]},
-                    {"Field": "resources.type", "Equals": ["AWS::S3::Object"]}
-                ]
-            },
-            {
-                "Name": "All Lambda data events",
-                "FieldSelectors": [
-                    {"Field": "eventCategory", "Equals": ["Data"]},
-                    {"Field": "resources.type", "Equals": ["AWS::Lambda::Function"]}
-                ]
-            }
-        ])
-
-        # Get the CloudWatch Logs group created by CloudTrail
-        cloudtrail_log_group = logs.LogGroup.from_log_group_name(
-            self, "CloudTrailLogGroup",
-            log_group_name="/aws/cloudtrail/msb-cloudtrail"
-        )
+            # CloudWatch Logs group created by the MSB trail
+            cloudtrail_log_group = logs.LogGroup.from_log_group_name(
+                self, "CloudTrailLogGroup",
+                log_group_name="/aws/cloudtrail/msb-cloudtrail"
+            )
+        else:
+            # Control Tower manages the Organisation Trail. Import its CloudWatch
+            # log group so the metric filters below can still attach to it.
+            # CT's baseline trail typically uses this log group name; override with
+            # --context cloudtrail_log_group_name=<name> if yours differs.
+            ct_log_group_name = (
+                self.node.try_get_context("cloudtrail_log_group_name")
+                or "aws-controltower/CloudTrailLogs"
+            )
+            cloudtrail_log_group = logs.LogGroup.from_log_group_name(
+                self, "CloudTrailLogGroup",
+                log_group_name=ct_log_group_name
+            )
 
         # ---------------------------------------------------------------------------
         # CloudWatch Metric Filters and Alarms — full CIS v3.0.0 set (3.1-3.14)

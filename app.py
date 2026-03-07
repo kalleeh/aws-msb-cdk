@@ -29,6 +29,7 @@ Tags.of(app).add("Environment", "Production")
 notification_email = app.node.try_get_context("notification_email")
 security_contact_phone = app.node.try_get_context("security_contact_phone")
 enable_object_lock = str(app.node.try_get_context("enable_object_lock") or "false").lower() == "true"
+control_tower_managed = str(app.node.try_get_context("control_tower_managed") or "false").lower() == "true"
 global_region = app.node.try_get_context("global_region") or "us-east-1"
 target_regions = app.node.try_get_context("target_regions") or [global_region]
 target = app.node.try_get_context("target")  # Optional: 'global' or 'regional'
@@ -58,6 +59,7 @@ if not target or target == "global":
         notification_email=notification_email,
         kms_stack=kms_stack,
         enable_object_lock=enable_object_lock,
+        control_tower_managed=control_tower_managed,
         env=global_env,
         termination_protection=True
     )
@@ -140,6 +142,7 @@ if not target or target == "regional":
         logging_regional_stack = LoggingRegionalStack(app, f"MSB-Logging-Regional-{region}",
             logs_bucket=logs_bucket,
             config_role=config_role,
+            control_tower_managed=control_tower_managed,
             env=regional_env
         )
 
@@ -147,6 +150,7 @@ if not target or target == "regional":
         security_regional_stack = SecurityRegionalStack(app, f"MSB-Security-Regional-{region}",
             notifications_topic=notifications_topic,
             notification_email=notification_email,
+            control_tower_managed=control_tower_managed,
             env=regional_env
         )
 
