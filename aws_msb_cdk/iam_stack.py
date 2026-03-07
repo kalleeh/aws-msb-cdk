@@ -13,7 +13,7 @@ from constructs import Construct
 from cdk_nag import NagSuppressions
 
 class IAMStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, notifications_topic=None, notification_email=None, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, notifications_topic=None, notification_email=None, security_contact_phone=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Store the notifications topic
@@ -28,9 +28,9 @@ class IAMStack(Stack):
         # Create IAM Access Analyzer (CIS 1.20)
         self.create_access_analyzer()
 
-        # Set security contact (CIS 1.18)
-        if notification_email:
-            self.create_security_contact(notification_email)
+        # Set security contact (CIS 1.18) — requires both email and phone
+        if notification_email and security_contact_phone:
+            self.create_security_contact(notification_email, security_contact_phone)
 
     def create_password_policy(self):
         """Create IAM password policy aligned with NIST SP 800-63B and CIS v3.0.0"""
@@ -191,32 +191,27 @@ class IAMStack(Stack):
             type="ACCOUNT"
         )
 
-    def create_security_contact(self, notification_email):
+    def create_security_contact(self, notification_email, security_contact_phone):
         """Set account security contact (CIS 1.18)"""
+        contact_params = {
+            "AlternateContactType": "SECURITY",
+            "EmailAddress": notification_email,
+            "Name": "Security Contact",
+            "PhoneNumber": security_contact_phone,
+            "Title": "Security"
+        }
         security_contact = cr.AwsCustomResource(self, "SecurityContact",
             install_latest_aws_sdk=False,
             on_create=cr.AwsSdkCall(
                 service="Account",
                 action="putAlternateContact",
-                parameters={
-                    "AlternateContactType": "SECURITY",
-                    "EmailAddress": notification_email,
-                    "Name": "Security Contact",
-                    "PhoneNumber": "+1-555-000-0000",  # placeholder
-                    "Title": "Security"
-                },
+                parameters=contact_params,
                 physical_resource_id=cr.PhysicalResourceId.of("security-contact")
             ),
             on_update=cr.AwsSdkCall(
                 service="Account",
                 action="putAlternateContact",
-                parameters={
-                    "AlternateContactType": "SECURITY",
-                    "EmailAddress": notification_email,
-                    "Name": "Security Contact",
-                    "PhoneNumber": "+1-555-000-0000",
-                    "Title": "Security"
-                },
+                parameters=contact_params,
                 physical_resource_id=cr.PhysicalResourceId.of("security-contact")
             ),
             policy=cr.AwsCustomResourcePolicy.from_statements([

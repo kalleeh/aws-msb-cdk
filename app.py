@@ -27,6 +27,7 @@ Tags.of(app).add("Environment", "Production")
 
 # Get deployment context
 notification_email = app.node.try_get_context("notification_email")
+security_contact_phone = app.node.try_get_context("security_contact_phone")
 global_region = app.node.try_get_context("global_region") or "us-east-1"
 target_regions = app.node.try_get_context("target_regions") or [global_region]
 target = app.node.try_get_context("target")  # Optional: 'global' or 'regional'
@@ -66,6 +67,7 @@ if not target or target == "global":
     iam_stack = IAMStack(app, "MSB-IAM-Global",
         notifications_topic=logging_stack.notifications_topic,
         notification_email=notification_email,
+        security_contact_phone=security_contact_phone,
         env=global_env,
         termination_protection=True
     )

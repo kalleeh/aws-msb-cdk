@@ -108,6 +108,46 @@ class LoggingStack(Stack):
                     sns_subs.EmailSubscription(notification_email)
                 )
 
+            # IAM role allowing SNS to write delivery status to CloudWatch Logs (SNS.2)
+            feedback_role = iam.Role(self, "SNSFeedbackRole",
+                assumed_by=iam.ServicePrincipal("sns.amazonaws.com"),
+                inline_policies={
+                    "CloudWatchLogs": iam.PolicyDocument(
+                        statements=[
+                            iam.PolicyStatement(
+                                actions=[
+                                    "logs:CreateLogGroup",
+                                    "logs:CreateLogStream",
+                                    "logs:PutLogEvents",
+                                    "logs:GetLogDelivery",
+                                    "logs:UpdateLogDelivery",
+                                    "logs:DeleteLogDelivery",
+                                    "logs:ListLogDeliveries",
+                                    "logs:PutRetentionPolicy",
+                                ],
+                                resources=["*"]
+                            )
+                        ]
+                    )
+                }
+            )
+            NagSuppressions.add_resource_suppressions(
+                feedback_role,
+                [{"id": "AwsSolutions-IAM5", "reason": "CloudWatch Logs delivery APIs do not support resource-level ARN scoping — wildcard is required by the service."}]
+            )
+
+            # Enable delivery status logging for HTTP/S, SQS, and Lambda subscribers (SNS.2)
+            cfn_topic = self.notifications_topic.node.default_child
+            cfn_topic.http_success_feedback_role_arn = feedback_role.role_arn
+            cfn_topic.http_failure_feedback_role_arn = feedback_role.role_arn
+            cfn_topic.http_success_feedback_sample_rate = 100
+            cfn_topic.sqs_success_feedback_role_arn = feedback_role.role_arn
+            cfn_topic.sqs_failure_feedback_role_arn = feedback_role.role_arn
+            cfn_topic.sqs_success_feedback_sample_rate = 100
+            cfn_topic.lambda_success_feedback_role_arn = feedback_role.role_arn
+            cfn_topic.lambda_failure_feedback_role_arn = feedback_role.role_arn
+            cfn_topic.lambda_success_feedback_sample_rate = 100
+
         # Get KMS key for CloudTrail encryption if available
         cloudtrail_key = None
         if kms_stack and hasattr(kms_stack, 'cloudtrail_key'):

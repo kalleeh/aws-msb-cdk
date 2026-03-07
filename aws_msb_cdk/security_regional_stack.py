@@ -27,6 +27,30 @@ class SecurityRegionalStack(Stack):
         # ------------------------------------------------------------------ #
         # S3 bucket for GuardDuty findings export
         # ------------------------------------------------------------------ #
+
+        # Dedicated access logs bucket for the findings bucket (S3.9 / CIS 3.6)
+        findings_access_logs_bucket = s3.Bucket(self, "GuardDutyAccessLogsBucket",
+            bucket_name=f"msb-guardduty-access-logs-{self.account}-{self.region}",
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            enforce_ssl=True,
+            versioned=False,
+            removal_policy=RemovalPolicy.RETAIN,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    id="AccessLogsRetention",
+                    enabled=True,
+                    expiration=Duration.days(90)
+                )
+            ]
+        )
+        # This bucket IS the access logs destination — self-logging would create
+        # recursion. S3.9 on the access logs bucket itself is a known exception.
+        NagSuppressions.add_resource_suppressions(
+            findings_access_logs_bucket,
+            [{"id": "AwsSolutions-S1", "reason": "This bucket is the access logs destination for the GuardDuty findings bucket. Enabling server access logs on an access logs bucket would create recursive logging and is explicitly not recommended by AWS."}]
+        )
+
         findings_bucket = s3.Bucket(self, "GuardDutyFindingsBucket",
             bucket_name=f"msb-guardduty-findings-{self.account}-{self.region}",
             encryption=s3.BucketEncryption.S3_MANAGED,
@@ -34,6 +58,8 @@ class SecurityRegionalStack(Stack):
             enforce_ssl=True,
             versioned=True,
             removal_policy=RemovalPolicy.RETAIN,
+            server_access_logs_bucket=findings_access_logs_bucket,
+            server_access_logs_prefix="guardduty-findings/",
             lifecycle_rules=[
                 s3.LifecycleRule(
                     id="FindingsRetention",
@@ -294,12 +320,6 @@ class SecurityRegionalStack(Stack):
         # security-findings archive; enabling them would require a separate access
         # logs bucket per region, adding operational overhead with no security benefit
         # for this purpose (the bucket itself is already encrypted, versioned, and
-        # blocked from public access).
-        NagSuppressions.add_resource_suppressions(
-            findings_bucket,
-            [{"id": "AwsSolutions-S1", "reason": "GuardDuty findings bucket does not require server access logs — it is a security archive, not a general-purpose bucket, and is already encrypted, versioned, and blocked from public access."}]
-        )
-
         # ------------------------------------------------------------------ #
         # Exports
         # ------------------------------------------------------------------ #
