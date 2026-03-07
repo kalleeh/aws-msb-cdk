@@ -5,6 +5,8 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets,
     aws_accessanalyzer as accessanalyzer,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cloudwatch_actions,
     custom_resources as cr,
     Duration,
     CfnResource
@@ -159,6 +161,23 @@ class IAMStack(Stack):
             f"/{self.stack_name}/IAMPolicyCheckerRole/DefaultPolicy/Resource",
             [{"id": "AwsSolutions-IAM5", "reason": "iam:ListUsers, iam:ListUserPolicies, and iam:ListAttachedUserPolicies are account-level IAM APIs that do not support resource-level restrictions — wildcard is required by the IAM API contract."}]
         )
+
+        # CloudWatch alarm — alert on any Lambda error so silent failures are caught
+        # self.notifications_topic is guaranteed non-None here (method returns early above if not set)
+        error_alarm = cloudwatch.Alarm(self, "IAMPolicyCheckerErrors",
+            metric=iam_policy_checker.metric_errors(
+                period=Duration.minutes(5)
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            alarm_name=f"msb-iam-policy-checker-errors-{self.region}",
+            alarm_description="The IAM policy checker Lambda has errors — direct-attached IAM user policies may no longer be automatically detected and reported."
+        )
+        if self.notifications_topic:
+            error_alarm.add_alarm_action(
+                cloudwatch_actions.SnsAction(self.notifications_topic)
+            )
 
         # Schedule the Lambda to run daily
         events.Rule(self, "IAMPolicyCheckerSchedule",

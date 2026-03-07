@@ -148,9 +148,9 @@ class LoggingStack(Stack):
             cfn_topic.lambda_failure_feedback_role_arn = feedback_role.role_arn
             cfn_topic.lambda_success_feedback_sample_rate = 100
 
+        cloudtrail_key = None
         if not control_tower_managed:
             # Get KMS key for CloudTrail encryption if available
-            cloudtrail_key = None
             if kms_stack and hasattr(kms_stack, 'cloudtrail_key'):
                 cloudtrail_key = kms_stack.cloudtrail_key
             else:

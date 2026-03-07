@@ -5,6 +5,8 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets,
     aws_s3 as s3,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cloudwatch_actions,
     Duration,
     RemovalPolicy,
     custom_resources as cr,
@@ -248,6 +250,22 @@ def handler(event, context):
             f"/{self.stack_name}/S3BucketPublicAccessCheckerRole/DefaultPolicy/Resource",
             [{"id": "AwsSolutions-IAM5", "reason": "s3:ListAllMyBuckets requires wildcard (account-level API). s3:GetBucketPublicAccessBlock and s3:PutBucketPublicAccessBlock require wildcard because the Lambda enforces public access blocks across all buckets in the account."}]
         )
+
+        # CloudWatch alarm — alert on any Lambda error so silent failures are caught
+        error_alarm = cloudwatch.Alarm(self, "S3PublicAccessCheckerErrors",
+            metric=s3_bucket_public_access_checker.metric_errors(
+                period=Duration.minutes(5)
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            alarm_name=f"msb-s3-public-access-checker-errors-{self.region}",
+            alarm_description="The S3 bucket public access checker Lambda has errors — bucket-level public access blocks may no longer be automatically enforced."
+        )
+        if self.notifications_topic:
+            error_alarm.add_alarm_action(
+                cloudwatch_actions.SnsAction(self.notifications_topic)
+            )
 
         # Schedule the Lambda to run daily
         events.Rule(self, "S3PublicAccessCheckerSchedule",

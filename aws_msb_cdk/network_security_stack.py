@@ -7,6 +7,8 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_events as events,
     aws_events_targets as targets,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cloudwatch_actions,
     Duration,
 )
 from constructs import Construct
@@ -204,6 +206,22 @@ def handler(event, context):
             f"/{self.stack_name}/SecureDefaultSGRole/DefaultPolicy/Resource",
             [{"id": "AwsSolutions-IAM5", "reason": "EC2 Describe/Revoke APIs require wildcard resources — security group and VPC IDs are not known at deploy time."}]
         )
+
+        # CloudWatch alarm — alert on any Lambda error so silent failures are caught
+        error_alarm = cloudwatch.Alarm(self, "SecureDefaultSGErrors",
+            metric=secure_default_sg_function.metric_errors(
+                period=Duration.minutes(5)
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            alarm_name=f"msb-default-sg-remediation-errors-{self.region}",
+            alarm_description="The default security group remediation Lambda has errors — default SGs may no longer be automatically secured."
+        )
+        if self.notifications_topic:
+            error_alarm.add_alarm_action(
+                cloudwatch_actions.SnsAction(self.notifications_topic)
+            )
 
         # Schedule the Lambda to run daily
         events.Rule(self, "SecureDefaultSGSchedule",
