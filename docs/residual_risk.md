@@ -1,241 +1,102 @@
-# Residual Risk Assessment
+# Residual Risk Register — AWS Security Baseline (MSB)
 
-This document outlines the security controls from AWS Foundational Security Best Practices (FSBP), CIS AWS Foundations Benchmark v3.0.0, and AWS Startup Security Baseline (SSB) that are not fully implemented in the AWS MSB CDK project, representing residual risk.
+| | |
+|---|---|
+| **Document title** | Residual Risk Register — AWS Minimum Security Baseline CDK Deployment |
+| **Version** | 1.0 |
+| **Date** | [DATE] |
+| **Prepared by** | [COMPANY NAME] Engineering |
+| **Reviewed by** | [NAME] |
+| **Approved by** | [NAME / TITLE] |
 
-## Risk Assessment Matrix
+---
 
-| Risk Level | Impact | Description |
-|------------|--------|-------------|
-| **High** | Critical | Controls that, if not implemented, could lead to significant security incidents with major business impact |
-| **Medium** | Significant | Controls that provide important security benefits but may have operational challenges or dependencies |
-| **Low** | Moderate | Controls that enhance security posture but have limited impact if not implemented |
+## 1. Purpose and Scope
 
-## Residual Risk Controls
+This document records the security controls from the AWS Foundational Security Best Practices (FSBP), CIS AWS Foundations Benchmark v3.0.0, and AWS Startup Security Baseline (SSB) that are not fully implemented by the AWS Minimum Security Baseline (MSB) CDK deployment, and documents the formal acceptance of the resulting residual risk. It is intended to be provided to auditors, enterprise security reviewers, and internal governance functions as evidence that identified gaps have been evaluated and consciously accepted by accountable owners.
 
-### IAM Controls
+The scope of this register is limited to controls within the MSB CDK project. Controls implemented elsewhere in the organization's security program are out of scope for this document.
 
-| Control ID | Standard | Description | Risk Level | Reason for Exclusion |
-|------------|----------|-------------|------------|----------------------|
-| IAM.4 | FSBP | Hardware MFA for root account | Medium | Requires physical hardware; MSB focuses on programmatic controls |
-| CIS 1.13 | CIS 3.0.0 | Ensure MFA is enabled for the "root" user | Medium | Requires manual setup; MSB monitors but can't enforce |
-| CIS 1.4 | CIS 3.0.0 | Ensure no 'root' user access key exists | Medium | Requires operational procedure; MSB monitors but can't enforce removal |
-| CIS 1.18 | CIS 3.0.0 | Ensure security contact information is registered | Low | Requires manual account configuration |
-| SSB.IAM.8 | AWS SSB | Implement privileged access management | High | Requires additional tooling and processes beyond MSB |
+---
 
-### Data Protection Controls
+## 2. Risk Acceptance Criteria
 
-| Control ID | Standard | Description | Risk Level | Reason for Exclusion |
-|------------|----------|-------------|------------|----------------------|
-| SSB.DAT.9 | AWS SSB | Implement data classification | Medium | Requires application-level controls and processes |
-| SSB.DAT.10 | AWS SSB | Implement DLP controls | High | Requires additional tooling beyond infrastructure |
+Residual risks documented here have been accepted on the following grounds. A risk is accepted when it meets one or more of these criteria:
 
-### Logging and Monitoring Controls
+- **(a) Technically infeasible to automate:** The control requires physical hardware, manual console interaction, or out-of-band processes that cannot be driven by infrastructure-as-code.
+- **(b) Requires manual operational procedure:** The control depends on human decision-making, organizational process, or tooling outside the scope of the MSB deployment.
+- **(c) Outside the scope of infrastructure-as-code controls:** The control applies at the application, organizational, or operational layer and cannot be enforced through AWS CDK alone.
 
-| Control ID | Standard | Description | Risk Level | Reason for Exclusion |
-|------------|----------|-------------|------------|----------------------|
-| CIS 3.3 | CIS 3.0.0 | Ensure CloudTrail log file validation is enabled | Low | Implemented but can't prevent future trails without validation |
-| CIS 3.7 | CIS 3.0.0 | Ensure CloudTrail logs are encrypted at rest using KMS CMKs | Low | Implemented but can't prevent future trails without encryption |
-| CIS 4.1-4.16 | CIS 3.0.0 | Various monitoring and alerting controls | Medium | MSB implements core monitoring but not all specific CIS monitoring recommendations |
-| SSB.LOG.10 | AWS SSB | Implement centralized log management | Medium | MSB centralizes logs but doesn't implement full log analysis |
+Risks accepted under this register are reviewed on at least an annual basis and whenever there is a material change to the MSB deployment or to the applicable frameworks.
 
-### Incident Response Controls
+---
 
-| Control ID | Standard | Description | Risk Level | Reason for Exclusion |
-|------------|----------|-------------|------------|----------------------|
-| SSB.IR.7 | AWS SSB | Develop incident response playbooks | High | Requires operational procedures beyond infrastructure |
-| SSB.IR.8 | AWS SSB | Implement automated remediation | Medium | MSB provides alerts but limited automated remediation |
-| SSB.IR.9 | AWS SSB | Conduct regular incident response exercises | Medium | Requires operational procedures beyond infrastructure |
+## 3. Formally Accepted Risks
 
-### Network Security Controls
+### 3.1 IAM Controls
 
-| Control ID | Standard | Description | Risk Level | Reason for Exclusion |
-|------------|----------|-------------|------------|----------------------|
-| CIS 5.5 | CIS 3.0.0 | Ensure routing tables for VPC peering are "least access" | Medium | MSB creates secure VPCs but doesn't manage peering connections |
-| SSB.NET.9 | AWS SSB | Implement network segmentation | Low | MSB creates basic network segmentation but may not meet all requirements |
-| SSB.NET.10 | AWS SSB | Implement WAF for web applications | High | Requires application-specific configuration |
+| Risk ID | Control | Framework | Description | Why Accepted | Compensating Control | Risk Owner | Date Accepted |
+|---|---|---|---|---|---|---|---|
+| MSB-RR-001 | IAM.4 | FSBP | Hardware MFA for root account | Requires physical hardware security key; cannot be provisioned or enforced through infrastructure-as-code | Root account activity monitored via EventBridge (CIS 1.7); CloudWatch metric filter alarms on all root API calls; root account usage restricted by operational policy | [CISO/CTO] | [DATE] |
+| MSB-RR-002 | CIS 1.13 | CIS 3.0.0 | MFA enabled for the root user | MFA enrollment is a manual, one-time console action performed outside of CDK | MSB-RR-001 compensating controls apply; Security Hub finding monitored; automated alert on any root console login | [CISO/CTO] | [DATE] |
+| MSB-RR-003 | CIS 1.4 | CIS 3.0.0 | No root user access key exists | Removal of root access keys, if they exist, is a manual action; the MSB cannot programmatically delete credentials it did not create | CloudTrail logs all root API calls; EventBridge alerts on root API activity; IAM credential report reviewed periodically as operational procedure | [CISO/CTO] | [DATE] |
+| MSB-RR-004 | CIS 1.18 | CIS 3.0.0 | Security contact information registered | AWS Account security contact is a manual console configuration in AWS Billing and Cost Management; the Security Hub finding for Account.1 is suppressed by MSB automation rule | MSB IAMStack optionally sets security contact via CDK custom resource when `notification_email` and `security_contact_phone` parameters are provided at deploy time; Security Hub finding suppressed where automated | [CISO/CTO] | [DATE] |
+| MSB-RR-005 | SSB.IAM.8 | AWS SSB | Privileged access management | Full PAM capability (just-in-time access, session recording, approval workflows) requires dedicated tooling (e.g., AWS IAM Identity Center, third-party PAM) that is outside MSB scope | IAM Access Analyzer enabled (CIS 1.20); IAM password policy enforced (CIS 1.8–1.14); IAM policy checker Lambda alerts on direct user policy attachments daily; least-privilege IAM roles enforced across MSB stacks | [CISO/CTO] | [DATE] |
 
-## Risk Mitigation Recommendations
+### 3.2 Data Protection Controls
 
-To address the residual risk from controls not fully implemented in the MSB:
+| Risk ID | Control | Framework | Description | Why Accepted | Compensating Control | Risk Owner | Date Accepted |
+|---|---|---|---|---|---|---|---|
+| MSB-RR-006 | SSB.DAT.9 | AWS SSB | Data classification | Application-level data classification requires application-specific tagging strategies, metadata schemas, and business process ownership; cannot be generalized in infrastructure-as-code | Amazon Macie enabled and configured to publish findings to SNS; Macie findings EventBridge rule alerts on sensitive data discovery in S3; S3 public access blocked at account and bucket level | [CISO/CTO] | [DATE] |
+| MSB-RR-007 | SSB.DAT.10 | AWS SSB | Data loss prevention (DLP) controls | Comprehensive DLP requires content inspection at the application layer and/or dedicated tooling (third-party DLP, S3 Object Lambda inspection pipelines) beyond MSB scope | Amazon Macie enabled for sensitive data discovery (partial DLP capability); S3 bucket-level and account-level public access blocks enforced by MSB Lambda; CloudTrail data events enabled for all S3 objects and all Lambda functions | [CISO/CTO] | [DATE] |
 
-### High Risk Controls
+### 3.3 Logging and Monitoring Controls
 
-1. **Privileged Access Management (SSB.IAM.8)**
-   - Implement AWS IAM Identity Center (formerly AWS SSO)
-   - Consider third-party PAM solutions for advanced use cases
-   - Implement just-in-time access for privileged operations
-   - Code sample:
-     ```python
-     # Example of how to integrate with IAM Identity Center
-     from aws_cdk import aws_sso as sso
-     
-     permission_set = sso.CfnPermissionSet(self, "AdminPermissionSet",
-         instance_arn="arn:aws:sso:::instance/ssoins-xxxxxxxxx",
-         name="AdminPermissionSet",
-         session_duration="PT2H",
-         managed_policies=["arn:aws:iam::aws:policy/AdministratorAccess"]
-     )
-     ```
+| Risk ID | Control | Framework | Description | Why Accepted | Compensating Control | Risk Owner | Date Accepted |
+|---|---|---|---|---|---|---|---|
+| MSB-RR-008 | CIS 3.3 | CIS 3.0.0 | CloudTrail log file validation enabled | The MSB enables log file validation on the managed trail; however, it cannot enforce validation on any future trails created outside of MSB outside this stack | MSB CloudTrail has file validation enabled (`enable_file_validation=True`); logs stored in versioned, encrypted S3 bucket with lifecycle retention; CloudWatch alarm fires on any CloudTrail configuration changes (CIS 3.5 alarm) | [CISO/CTO] | [DATE] |
+| MSB-RR-009 | CIS 3.7 | CIS 3.0.0 | CloudTrail logs encrypted at rest using KMS CMK | MSB encrypts the managed trail with a KMS CMK; future trails created outside the MSB stack are outside MSB control | MSB trail uses dedicated KMS CMK with automatic key rotation; KMS key changes trigger CloudWatch alarm (CIS 3.7 alarm); CloudTrail configuration changes trigger separate alarm | [CISO/CTO] | [DATE] |
+| MSB-RR-010 | CIS 4.1–4.16 | CIS 3.0.0 | Full set of CIS monitoring and alerting controls | MSB implements all 13 CIS metric filter alarms (3.1–3.14, 4.4, 4.15, 4.16); some CIS monitoring controls require application-layer instrumentation or workload-specific configuration outside MSB scope | All 13 CIS CloudWatch metric filter alarms deployed; GuardDuty enabled with all protection plans; Security Hub FSBP and CIS v3.0.0 standards enabled; EventBridge rules covering IAM, SG, NACL, and root activity | [CISO/CTO] | [DATE] |
+| MSB-RR-011 | SSB.LOG.10 | AWS SSB | Centralized log management with analysis | MSB centralizes logs to CloudTrail + S3 + CloudWatch Logs; full log analysis (SIEM, correlation, threat hunting) requires additional tooling (OpenSearch, third-party SIEM) beyond MSB scope | CloudTrail multi-region trail with one-year retention; CloudWatch Logs group for CloudTrail with one-year retention; VPC Flow Logs enabled via NetworkSecurityStack; GuardDuty findings exported to dedicated S3 bucket | [CISO/CTO] | [DATE] |
 
-2. **Data Loss Prevention (SSB.DAT.10)**
-   - Implement Amazon Macie for sensitive data discovery
-   - Configure S3 Object Lambda for content inspection
-   - Consider third-party DLP solutions for comprehensive coverage
-   - Code sample:
-     ```python
-     # Example of enabling Macie
-     from aws_cdk import aws_macie as macie
-     
-     macie_session = macie.CfnSession(self, "MacieSession")
-     ```
+### 3.4 Incident Response Controls
 
-3. **Web Application Firewall (SSB.NET.10)**
-   - Implement AWS WAF for web applications
-   - Configure AWS WAF security automations
-   - Create custom rules for application-specific threats
-   - Code sample:
-     ```python
-     # Example of adding WAF to resources
-     from aws_cdk import aws_wafv2 as wafv2
-     
-     web_acl = wafv2.CfnWebACL(self, "WebACL",
-         default_action={"allow": {}},
-         scope="REGIONAL",
-         visibility_config={
-             "cloudWatchMetricsEnabled": True,
-             "metricName": "WebACLMetric",
-             "sampledRequestsEnabled": True
-         },
-         rules=[
-             {
-                 "name": "AWS-AWSManagedRulesCommonRuleSet",
-                 "priority": 0,
-                 "statement": {
-                     "managedRuleGroupStatement": {
-                         "vendorName": "AWS",
-                         "name": "AWSManagedRulesCommonRuleSet"
-                     }
-                 },
-                 "overrideAction": {"none": {}},
-                 "visibilityConfig": {
-                     "cloudWatchMetricsEnabled": True,
-                     "metricName": "AWS-AWSManagedRulesCommonRuleSet",
-                     "sampledRequestsEnabled": True
-                 }
-             }
-         ]
-     )
-     ```
+| Risk ID | Control | Framework | Description | Why Accepted | Compensating Control | Risk Owner | Date Accepted |
+|---|---|---|---|---|---|---|---|
+| MSB-RR-012 | SSB.IR.7 | AWS SSB | Incident response playbooks | IR playbooks are operational documents requiring organizational process definition; cannot be generated by infrastructure-as-code | MSB alert response runbook (`docs/alert-response.md`) provides per-alert guidance; SNS alerting ensures findings reach the responsible team; GuardDuty and Security Hub provide per-finding remediation guidance inline | [CISO/CTO] | [DATE] |
+| MSB-RR-013 | SSB.IR.8 | AWS SSB | Automated remediation | MSB provides automated enforcement for default SG rules (NetworkSecurityStack Lambda) and S3 public access blocks (S3SecurityStack Lambda); broader automated remediation (e.g., Security Hub automated response and remediation, AWS Systems Manager Automation) is outside MSB scope | Default SG secured automatically daily and on change events; S3 public access blocks enforced automatically daily and on bucket creation; GuardDuty findings published to SNS within 15 minutes; Security Hub findings available for custom automation rules | [CISO/CTO] | [DATE] |
+| MSB-RR-014 | SSB.IR.9 | AWS SSB | Regular incident response exercises | Tabletop exercises and IR drills are an organizational and personnel process; they cannot be implemented in infrastructure-as-code | IR runbook documented; alerting pipeline tested as part of MSB deployment validation; teams encouraged to conduct annual tabletop exercises using the alert-response runbook as the basis | [CISO/CTO] | [DATE] |
 
-4. **Incident Response Playbooks (SSB.IR.7)**
-   - Develop documentation and playbooks for common security incidents
-   - Integrate with AWS Systems Manager Incident Manager
-   - Conduct regular tabletop exercises
-   - Code sample:
-     ```python
-     # Example of setting up Systems Manager Incident Manager
-     from aws_cdk import aws_ssm_incidents as incidents
-     
-     response_plan = incidents.CfnResponsePlan(self, "SecurityIncidentResponsePlan",
-         name="security-incident-response",
-         incident_template={
-             "title": "Security Incident",
-             "impact": 3
-         },
-         engagements=["arn:aws:ssm-contacts:region:account-id:contact/contact-name"]
-     )
-     ```
+### 3.5 Network Security Controls
 
-### Medium Risk Controls
+| Risk ID | Control | Framework | Description | Why Accepted | Compensating Control | Risk Owner | Date Accepted |
+|---|---|---|---|---|---|---|---|
+| MSB-RR-015 | CIS 5.5 | CIS 3.0.0 | VPC peering routing tables configured for least access | MSB does not create or manage VPC peering connections; routing table configuration for peered VPCs is workload-specific and must be managed by the teams deploying those workloads | VPC changes and route table changes monitored by CloudWatch metric filter alarms (CIS 3.13, 3.14); NACL changes alarmed (CIS 4.16); Security Hub evaluates VPC security group and routing configurations continuously | [CISO/CTO] | [DATE] |
+| MSB-RR-016 | SSB.NET.9 | AWS SSB | Network segmentation | MSB creates secure VPC infrastructure with VPC Flow Logs; application-tier segmentation (e.g., separate VPCs per environment, Transit Gateway hub-and-spoke) depends on workload architecture decisions outside MSB scope | VPC Flow Logs enabled with one-year CloudWatch Logs retention; default security groups secured to deny all; Security Hub evaluates EC2.2 (default VPC SG restricted) | [CISO/CTO] | [DATE] |
+| MSB-RR-017 | SSB.NET.10 | AWS SSB | WAF for web applications | AWS WAF configuration is application-specific (requires knowledge of the web application's traffic patterns, endpoints, and threat model); cannot be generalized in a baseline CDK deployment | GuardDuty detects application-layer anomalies (e.g., brute force, credential stuffing) where applicable; CloudFront with AWS Managed Rules WAF is the recommended remediation pattern for teams deploying web applications | [CISO/CTO] | [DATE] |
 
-1. **Root Account Security (IAM.4, CIS 1.13, CIS 1.4)**
-   - Implement hardware MFA for the root account (manual process)
-   - Regularly audit root account credentials
-   - Establish operational procedures for root account management
-   - Consider implementing break-glass procedures for root access
+---
 
-2. **Centralized Log Management (SSB.LOG.10)**
-   - Enhance the logging stack to include log analysis capabilities
-   - Consider integrating with Amazon OpenSearch Service
-   - Code sample:
-     ```python
-     # Example of adding OpenSearch for log analysis
-     from aws_cdk import aws_opensearchservice as opensearch
-     
-     log_analysis_domain = opensearch.Domain(self, "LogAnalysisDomain",
-         version=opensearch.EngineVersion.OPENSEARCH_1_3,
-         capacity={
-             "master_nodes": 3,
-             "data_nodes": 2
-         },
-         ebs={
-             "volume_size": 100
-         },
-         encryption_at_rest={
-             "enabled": True
-         },
-         node_to_node_encryption=True,
-         enforce_https=True
-     )
-     ```
+## 4. Review and Sign-Off
 
-3. **Data Classification (SSB.DAT.9)**
-   - Implement tagging strategies for data classification
-   - Consider using Amazon Macie for automated data classification
-   - Develop data handling procedures based on classification levels
+This register has been reviewed and the residual risks documented above are formally accepted by the named risk owners.
 
-### Low Risk Controls
+| Role | Name | Signature | Date |
+|---|---|---|---|
+| Risk Owner (Engineering Lead) | | | |
+| CISO / CTO | | | |
+| Next scheduled review date | | | [DATE + 1 year] |
 
-1. **Security Contact Information (CIS 1.18)**
-   - Manually register security contact information in the AWS account
-   - Establish a process to keep contact information up to date
+All residual risks in this register shall be re-evaluated:
+- Annually, on or before the anniversary of the "Date Accepted" entries above
+- Upon any material change to the MSB CDK project that affects controls relevant to the listed risks
+- Upon any material change to the applicable frameworks (FSBP, CIS, AWS SSB)
+- Following any security incident that is directly related to a listed residual risk
 
-2. **Network Segmentation (SSB.NET.9)**
-   - Enhance VPC design with additional security groups and NACLs
-   - Implement Transit Gateway for advanced network segmentation
-   - Code sample:
-     ```python
-     # Example of enhanced network segmentation
-     app_tier_sg = ec2.SecurityGroup(self, "AppTierSG",
-         vpc=vpc,
-         description="Security group for application tier",
-         allow_all_outbound=False
-     )
-     
-     data_tier_sg = ec2.SecurityGroup(self, "DataTierSG",
-         vpc=vpc,
-         description="Security group for data tier",
-         allow_all_outbound=False
-     )
-     
-     # Allow only specific traffic between tiers
-     app_tier_sg.add_ingress_rule(
-         ec2.Peer.security_group_id(web_tier_sg.security_group_id),
-         ec2.Port.tcp(8080),
-         "Allow traffic from web tier"
-     )
-     ```
+---
 
-## Implementation Roadmap
+## 5. Change History
 
-To address the residual risk, consider the following implementation roadmap:
-
-1. **Phase 1: High-Risk Controls** (1-2 months)
-   - Implement Web Application Firewall (SSB.NET.10)
-   - Set up privileged access management (SSB.IAM.8)
-   - Develop incident response playbooks (SSB.IR.7)
-
-2. **Phase 2: Medium-Risk Controls** (2-3 months)
-   - Enhance root account security (IAM.4, CIS 1.13, CIS 1.4)
-   - Set up centralized log management (SSB.LOG.10)
-   - Implement data classification (SSB.DAT.9)
-
-3. **Phase 3: Low-Risk Controls** (3-4 months)
-   - Register security contact information (CIS 1.18)
-   - Improve network segmentation (SSB.NET.9)
-
-## Conclusion
-
-While the AWS MSB CDK implementation provides a strong security foundation, addressing these residual risks will further enhance the security posture of your AWS environment. The implementation roadmap provides a structured approach to addressing these risks based on their priority.
-
-Many of these residual risks require manual processes, operational procedures, or additional AWS services that go beyond the scope of infrastructure as code. Organizations should consider these risks as part of their overall security program and implement appropriate controls based on their specific requirements and risk tolerance.
+| Version | Date | Author | Description |
+|---|---|---|---|
+| 1.0 | [DATE] | [COMPANY NAME] Engineering | Initial formal risk register; converted from informal residual risk notes to auditor-facing format. All original risk content retained; reformatted as formal risk register with Risk IDs, compensating controls, and risk ownership. |
