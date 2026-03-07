@@ -17,7 +17,7 @@ from constructs import Construct
 from cdk_nag import NagSuppressions
 
 class LoggingStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, notifications_topic=None, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, s3_security_stack=None, notification_email=None, kms_stack=None, notifications_topic=None, enable_object_lock=False, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # S3 Bucket for Logs using secure bucket configuration if available
@@ -69,8 +69,8 @@ class LoggingStack(Stack):
                 removal_policy=RemovalPolicy.RETAIN,
                 server_access_logs_bucket=access_logs_bucket,
                 server_access_logs_prefix="cloudtrail-logs/",
-                object_lock_enabled=True,
-                object_lock_default_retention=s3.ObjectLockRetention.governance(Duration.days(365)),
+                object_lock_enabled=enable_object_lock,
+                object_lock_default_retention=s3.ObjectLockRetention.governance(Duration.days(365)) if enable_object_lock else None,
                 lifecycle_rules=[
                     s3.LifecycleRule(
                         id="LogRetention",

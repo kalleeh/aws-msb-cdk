@@ -28,6 +28,7 @@ Tags.of(app).add("Environment", "Production")
 # Get deployment context
 notification_email = app.node.try_get_context("notification_email")
 security_contact_phone = app.node.try_get_context("security_contact_phone")
+enable_object_lock = str(app.node.try_get_context("enable_object_lock") or "false").lower() == "true"
 global_region = app.node.try_get_context("global_region") or "us-east-1"
 target_regions = app.node.try_get_context("target_regions") or [global_region]
 target = app.node.try_get_context("target")  # Optional: 'global' or 'regional'
@@ -56,6 +57,7 @@ if not target or target == "global":
     logging_stack = LoggingStack(app, "MSB-Logging-Global",
         notification_email=notification_email,
         kms_stack=kms_stack,
+        enable_object_lock=enable_object_lock,
         env=global_env,
         termination_protection=True
     )
