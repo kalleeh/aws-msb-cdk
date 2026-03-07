@@ -1,687 +1,294 @@
-# Programmatic Security Controls for Residual Risk
-
-This document outlines programmatic security controls that can be added to the AWS MSB CDK templates to address residual risk without requiring significant operational practices or adding many new AWS services.
-
-## Implementable Controls
-
-The following controls can be added to the MSB CDK implementation with minimal changes:
-
-### 1. EBS Volume Encryption by Default (CIS 2.2.1)
-
-**Risk Level**: Medium
-
-**Implementation**: Add a custom resource to enable EBS encryption by default for the account.
-
-```python
-# Add to KMSStack or create a new EncryptionStack
-from aws_cdk import custom_resources as cr
-
-# Custom resource to enable EBS encryption by default
-enable_ebs_encryption = cr.AwsCustomResource(self, "EnableEBSEncryptionByDefault",
-    on_create=cr.AwsSdkCall(
-        service="EC2",
-        action="enableEbsEncryptionByDefault",
-        parameters={},
-        physical_resource_id=cr.PhysicalResourceId.of("enable-ebs-encryption-by-default")
-    ),
-    policy=cr.AwsCustomResourcePolicy.from_statements([
-        iam.PolicyStatement(
-            actions=["ec2:EnableEbsEncryptionByDefault"],
-            resources=["*"]
-        )
-    ])
-)
-```
-
-**Benefits**:
-- Ensures all new EBS volumes are encrypted by default
-- Addresses CIS AWS Foundations Benchmark v3.0.0 control 2.2.1
-- No operational overhead once implemented
-
-### 2. S3 Bucket Default Encryption (CIS 2.1.1)
-
-**Risk Level**: Low
-
-**Implementation**: Add a custom resource to set default encryption for S3 buckets.
-
-```python
-# Add to S3SecurityStack
-bucket_default_encryption = cr.AwsCustomResource(self, "S3DefaultEncryption",
-    on_create=cr.AwsSdkCall(
-        service="S3Control",
-        action="putPublicAccessBlock",
-        parameters={
-            "AccountId": cdk.Aws.ACCOUNT_ID,
-            "PublicAccessBlockConfiguration": {
-                "BlockPublicAcls": True,
-                "BlockPublicPolicy": True,
-                "IgnorePublicAcls": True,
-                "RestrictPublicBuckets": True
-            }
-        },
-        physical_resource_id=cr.PhysicalResourceId.of("s3-default-encryption")
-    ),
-    policy=cr.AwsCustomResourcePolicy.from_statements([
-        iam.PolicyStatement(
-            actions=["s3:PutEncryptionConfiguration"],
-            resources=["*"]
-        )
-    ])
-)
-```
-
-**Benefits**:
-- Ensures all new S3 buckets have encryption enabled by default
-- Addresses CIS AWS Foundations Benchmark v3.0.0 control 2.1.1
-- No operational overhead once implemented
-
-### 3. IAM Access Key Rotation Monitoring (CIS 1.14)
-
-**Risk Level**: Medium
-
-**Implementation**: Add a Lambda function and EventBridge rule to monitor and alert on old IAM access keys.
-
-```python
-# Add to IAMStack
-from aws_cdk import aws_lambda as lambda_
-from aws_cdk import aws_events as events
-from aws_cdk import aws_events_targets as targets
-
-# Lambda function to check for old access keys
-access_key_checker = lambda_.Function(self, "AccessKeyChecker",
-    runtime=lambda_.Runtime.PYTHON_3_9,
-    handler="index.handler",
-    code=lambda_.Code.from_asset("lambda/access_key_checker"),
-    environment={
-        "MAX_KEY_AGE_DAYS": "90",
-        "NOTIFICATION_TOPIC_ARN": notifications_topic.topic_arn if notifications_topic else ""
-    },
-    timeout=Duration.seconds(60)
-)
-
-access_key_checker.add_to_role_policy(
-    iam.PolicyStatement(
-        actions=[
-            "iam:ListUsers",
-            "iam:ListAccessKeys",
-            "iam:GetAccessKeyLastUsed"
-        ],
-        resources=["*"]
-    )
-)
-
-if notifications_topic:
-    access_key_checker.add_to_role_policy(
-        iam.PolicyStatement(
-            actions=["sns:Publish"],
-            resources=[notifications_topic.topic_arn]
-        )
-    )
-
-# Schedule the Lambda to run daily
-events.Rule(self, "AccessKeyCheckerSchedule",
-    schedule=events.Schedule.rate(Duration.days(1)),
-    targets=[targets.LambdaFunction(access_key_checker)]
-)
-```
-
-**Lambda Code (lambda/access_key_checker/index.py)**:
-```python
-import boto3
-import os
-import datetime
-import json
-
-def handler(event, context):
-    iam = boto3.client('iam')
-    sns = boto3.client('sns')
-    max_age_days = int(os.environ.get('MAX_KEY_AGE_DAYS', 90))
-    topic_arn = os.environ.get('NOTIFICATION_TOPIC_ARN', '')
-    
-    users = iam.list_users()['Users']
-    old_keys = []
-    
-    for user in users:
-        username = user['UserName']
-        keys = iam.list_access_keys(UserName=username)['AccessKeyMetadata']
-        
-        for key in keys:
-            key_id = key['AccessKeyId']
-            create_date = key['CreateDate']
-            status = key['Status']
-            
-            # Calculate key age
-            key_age = (datetime.datetime.now(datetime.timezone.utc) - create_date).days
-            
-            if key_age > max_age_days and status == 'Active':
-                old_keys.append({
-                    'username': username,
-                    'key_id': key_id,
-                    'age_days': key_age
-                })
-    
-    if old_keys and topic_arn:
-        message = {
-            'subject': 'IAM Access Keys Rotation Required',
-            'message': f'The following IAM access keys are older than {max_age_days} days and should be rotated:',
-            'keys': old_keys
-        }
-        
-        sns.publish(
-            TopicArn=topic_arn,
-            Subject=message['subject'],
-            Message=json.dumps(message, indent=2)
-        )
-    
-    return {
-        'statusCode': 200,
-        'old_keys_count': len(old_keys)
-    }
-```
-
-**Benefits**:
-- Monitors IAM access keys for rotation compliance
-- Sends notifications for keys that need rotation
-- Addresses CIS AWS Foundations Benchmark v3.0.0 control 1.14
-- No manual monitoring required
-
-### 4. Default Security Group Monitoring (CIS 5.4)
-
-**Risk Level**: Low
-
-**Implementation**: Add a Lambda function to continuously monitor and lock down default security groups.
-
-```python
-# Add to NetworkSecurityStack
-secure_default_sg_function = lambda_.Function(self, "SecureDefaultSGFunction",
-    runtime=lambda_.Runtime.PYTHON_3_9,
-    handler="index.handler",
-    code=lambda_.Code.from_asset("lambda/secure_default_sg"),
-    timeout=Duration.seconds(60),
-    environment={
-        "NOTIFICATION_TOPIC_ARN": notifications_topic.topic_arn if notifications_topic else ""
-    }
-)
-
-secure_default_sg_function.add_to_role_policy(
-    iam.PolicyStatement(
-        actions=[
-            "ec2:DescribeSecurityGroups",
-            "ec2:RevokeSecurityGroupIngress",
-            "ec2:RevokeSecurityGroupEgress",
-            "ec2:UpdateSecurityGroupRuleDescriptionsIngress",
-            "ec2:UpdateSecurityGroupRuleDescriptionsEgress"
-        ],
-        resources=["*"]
-    )
-)
-
-if notifications_topic:
-    secure_default_sg_function.add_to_role_policy(
-        iam.PolicyStatement(
-            actions=["sns:Publish"],
-            resources=[notifications_topic.topic_arn]
-        )
-    )
-
-# Schedule the Lambda to run daily
-events.Rule(self, "SecureDefaultSGSchedule",
-    schedule=events.Schedule.rate(Duration.days(1)),
-    targets=[targets.LambdaFunction(secure_default_sg_function)]
-)
-
-# Also trigger on security group changes
-sg_changes_rule = events.Rule(self, "SGChangesRule",
-    event_pattern=events.EventPattern(
-        source=["aws.ec2"],
-        detail_type=["AWS API Call via CloudTrail"],
-        detail={
-            "eventSource": ["ec2.amazonaws.com"],
-            "eventName": [
-                "AuthorizeSecurityGroupIngress",
-                "AuthorizeSecurityGroupEgress",
-                "CreateSecurityGroup"
-            ]
-        }
-    ),
-    targets=[targets.LambdaFunction(secure_default_sg_function)]
-)
-```
-
-**Lambda Code (lambda/secure_default_sg/index.py)**:
-```python
-import boto3
-import os
-import json
-
-def handler(event, context):
-    ec2 = boto3.client('ec2')
-    sns = boto3.client('sns')
-    topic_arn = os.environ.get('NOTIFICATION_TOPIC_ARN', '')
-    
-    # Get all VPCs
-    vpcs = ec2.describe_vpcs()
-    
-    secured_groups = []
-    for vpc in vpcs['Vpcs']:
-        vpc_id = vpc['VpcId']
-        
-        # Get default security group for this VPC
-        security_groups = ec2.describe_security_groups(
-            Filters=[
-                {'Name': 'vpc-id', 'Values': [vpc_id]},
-                {'Name': 'group-name', 'Values': ['default']}
-            ]
-        )
-        
-        for sg in security_groups['SecurityGroups']:
-            sg_id = sg['GroupId']
-            modified = False
-            
-            # Check and remove ingress rules
-            if sg['IpPermissions']:
-                ec2.revoke_security_group_ingress(
-                    GroupId=sg_id,
-                    IpPermissions=sg['IpPermissions']
-                )
-                modified = True
-            
-            # Check and remove egress rules (if not the default "allow all")
-            if sg['IpPermissionsEgress'] and not (
-                len(sg['IpPermissionsEgress']) == 1 and
-                sg['IpPermissionsEgress'][0].get('IpProtocol', '') == '-1' and
-                any(ip_range.get('CidrIp') == '0.0.0.0/0' for ip_range in sg['IpPermissionsEgress'][0].get('IpRanges', []))
-            ):
-                ec2.revoke_security_group_egress(
-                    GroupId=sg_id,
-                    IpPermissions=sg['IpPermissionsEgress']
-                )
-                modified = True
-            
-            if modified:
-                secured_groups.append({
-                    'vpc_id': vpc_id,
-                    'security_group_id': sg_id
-                })
-    
-    # Send notification if any groups were modified
-    if secured_groups and topic_arn:
-        message = {
-            'subject': 'Default Security Groups Secured',
-            'message': 'The following default security groups were found with rules and have been secured:',
-            'groups': secured_groups
-        }
-        
-        sns.publish(
-            TopicArn=topic_arn,
-            Subject=message['subject'],
-            Message=json.dumps(message, indent=2)
-        )
-    
-    return {
-        'statusCode': 200,
-        'secured_groups_count': len(secured_groups)
-    }
-```
-
-**Benefits**:
-- Continuously monitors and secures default security groups
-- Automatically remediates non-compliant security groups
-- Addresses CIS AWS Foundations Benchmark v3.0.0 control 5.4
-- Provides notifications when remediation occurs
-
-### 5. Root Account Activity Monitoring (CIS 1.7, IAM.7)
-
-**Risk Level**: Medium
-
-**Implementation**: Add EventBridge rules to monitor and alert on root account usage.
-
-```python
-# Add to SecurityMonitoringStack
-root_activity_rule = events.Rule(self, "RootActivityMonitoringRule",
-    rule_name="msb-root-activity-monitoring",
-    description="Monitors and alerts on root account activity",
-    event_pattern=events.EventPattern(
-        source=["aws.signin"],
-        detail_type=["AWS Console Sign In via CloudTrail"],
-        detail={
-            "userIdentity": {
-                "type": ["Root"]
-            }
-        }
-    )
-)
-
-if notifications_topic:
-    root_activity_rule.add_target(targets.SnsTopic(
-        notifications_topic,
-        message=events.RuleTargetInput.from_text(
-            "ALERT: AWS Root account was used to sign in to the console. " +
-            "Root account usage should be minimized. " +
-            "Event details: " +
-            events.RuleTargetInput.from_event("$.detail").to_string()
-        )
-    ))
-
-# Also monitor root account API calls
-root_api_rule = events.Rule(self, "RootAPIActivityRule",
-    rule_name="msb-root-api-activity-monitoring",
-    description="Monitors and alerts on root account API activity",
-    event_pattern=events.EventPattern(
-        source=["aws.cloudtrail"],
-        detail_type=["AWS API Call via CloudTrail"],
-        detail={
-            "userIdentity": {
-                "type": ["Root"]
-            }
-        }
-    )
-)
-
-if notifications_topic:
-    root_api_rule.add_target(targets.SnsTopic(
-        notifications_topic,
-        message=events.RuleTargetInput.from_text(
-            "ALERT: AWS Root account was used to make API calls. " +
-            "Root account usage should be minimized. " +
-            "Event details: " +
-            events.RuleTargetInput.from_event("$.detail").to_string()
-        )
-    ))
-```
-
-**Benefits**:
-- Provides real-time monitoring of root account usage
-- Sends immediate alerts when root account is used
-- Addresses CIS AWS Foundations Benchmark v3.0.0 control 1.7 and FSBP IAM.7
-- No operational overhead once implemented
-
-### 6. S3 Bucket-Level Public Access Blocks (CIS 2.1.5)
-
-**Risk Level**: Low
-
-**Implementation**: Add a Lambda function to monitor and enforce bucket-level public access blocks.
-
-```python
-# Add to S3SecurityStack
-s3_bucket_public_access_checker = lambda_.Function(self, "S3BucketPublicAccessChecker",
-    runtime=lambda_.Runtime.PYTHON_3_9,
-    handler="index.handler",
-    code=lambda_.Code.from_asset("lambda/s3_public_access_checker"),
-    timeout=Duration.seconds(300),
-    environment={
-        "NOTIFICATION_TOPIC_ARN": notifications_topic.topic_arn if notifications_topic else ""
-    }
-)
-
-s3_bucket_public_access_checker.add_to_role_policy(
-    iam.PolicyStatement(
-        actions=[
-            "s3:GetBucketPublicAccessBlock",
-            "s3:PutBucketPublicAccessBlock",
-            "s3:ListAllMyBuckets"
-        ],
-        resources=["*"]
-    )
-)
-
-if notifications_topic:
-    s3_bucket_public_access_checker.add_to_role_policy(
-        iam.PolicyStatement(
-            actions=["sns:Publish"],
-            resources=[notifications_topic.topic_arn]
-        )
-    )
-
-# Schedule the Lambda to run daily
-events.Rule(self, "S3PublicAccessCheckerSchedule",
-    schedule=events.Schedule.rate(Duration.days(1)),
-    targets=[targets.LambdaFunction(s3_bucket_public_access_checker)]
-)
-
-# Also trigger on bucket creation
-bucket_creation_rule = events.Rule(self, "S3BucketCreationRule",
-    event_pattern=events.EventPattern(
-        source=["aws.s3"],
-        detail_type=["AWS API Call via CloudTrail"],
-        detail={
-            "eventSource": ["s3.amazonaws.com"],
-            "eventName": ["CreateBucket"]
-        }
-    ),
-    targets=[targets.LambdaFunction(s3_bucket_public_access_checker)]
-)
-```
-
-**Lambda Code (lambda/s3_public_access_checker/index.py)**:
-```python
-import boto3
-import os
-import json
-import time
-
-def handler(event, context):
-    s3 = boto3.client('s3')
-    sns = boto3.client('sns')
-    topic_arn = os.environ.get('NOTIFICATION_TOPIC_ARN', '')
-    
-    # Get all buckets
-    buckets = s3.list_buckets()['Buckets']
-    
-    enforced_buckets = []
-    failed_buckets = []
-    
-    for bucket in buckets:
-        bucket_name = bucket['Name']
-        try:
-            # Check if public access block is already configured
-            try:
-                public_access_block = s3.get_public_access_block(Bucket=bucket_name)
-                config = public_access_block['PublicAccessBlockConfiguration']
-                
-                # If any setting is not enabled, update it
-                if not (config.get('BlockPublicAcls', False) and 
-                        config.get('BlockPublicPolicy', False) and 
-                        config.get('IgnorePublicAcls', False) and 
-                        config.get('RestrictPublicBuckets', False)):
-                    
-                    s3.put_public_access_block(
-                        Bucket=bucket_name,
-                        PublicAccessBlockConfiguration={
-                            'BlockPublicAcls': True,
-                            'BlockPublicPolicy': True,
-                            'IgnorePublicAcls': True,
-                            'RestrictPublicBuckets': True
-                        }
-                    )
-                    enforced_buckets.append(bucket_name)
-            
-            except s3.exceptions.NoSuchPublicAccessBlockConfiguration:
-                # No configuration exists, create one
-                s3.put_public_access_block(
-                    Bucket=bucket_name,
-                    PublicAccessBlockConfiguration={
-                        'BlockPublicAcls': True,
-                        'BlockPublicPolicy': True,
-                        'IgnorePublicAcls': True,
-                        'RestrictPublicBuckets': True
-                    }
-                )
-                enforced_buckets.append(bucket_name)
-                
-        except Exception as e:
-            failed_buckets.append({
-                'bucket_name': bucket_name,
-                'error': str(e)
-            })
-    
-    # Send notification if any buckets were modified or failed
-    if topic_arn and (enforced_buckets or failed_buckets):
-        message = {
-            'subject': 'S3 Bucket Public Access Block Enforcement',
-            'message': 'S3 bucket public access block enforcement results:',
-            'enforced_buckets': enforced_buckets,
-            'failed_buckets': failed_buckets
-        }
-        
-        sns.publish(
-            TopicArn=topic_arn,
-            Subject=message['subject'],
-            Message=json.dumps(message, indent=2)
-        )
-    
-    return {
-        'statusCode': 200,
-        'enforced_buckets_count': len(enforced_buckets),
-        'failed_buckets_count': len(failed_buckets)
-    }
-```
-
-**Benefits**:
-- Ensures all S3 buckets have public access blocks enabled
-- Automatically remediates non-compliant buckets
-- Addresses CIS AWS Foundations Benchmark v3.0.0 control 2.1.5
-- Provides notifications on enforcement actions
-
-### 7. IAM Policy Governance (IAM.16)
-
-**Risk Level**: Low
-
-**Implementation**: Add a Lambda function to monitor and report on IAM policies attached directly to users.
-
-```python
-# Add to IAMStack
-iam_policy_checker = lambda_.Function(self, "IAMPolicyChecker",
-    runtime=lambda_.Runtime.PYTHON_3_9,
-    handler="index.handler",
-    code=lambda_.Code.from_asset("lambda/iam_policy_checker"),
-    timeout=Duration.seconds(60),
-    environment={
-        "NOTIFICATION_TOPIC_ARN": notifications_topic.topic_arn if notifications_topic else ""
-    }
-)
-
-iam_policy_checker.add_to_role_policy(
-    iam.PolicyStatement(
-        actions=[
-            "iam:ListUsers",
-            "iam:ListUserPolicies",
-            "iam:ListAttachedUserPolicies"
-        ],
-        resources=["*"]
-    )
-)
-
-if notifications_topic:
-    iam_policy_checker.add_to_role_policy(
-        iam.PolicyStatement(
-            actions=["sns:Publish"],
-            resources=[notifications_topic.topic_arn]
-        )
-    )
-
-# Schedule the Lambda to run daily
-events.Rule(self, "IAMPolicyCheckerSchedule",
-    schedule=events.Schedule.rate(Duration.days(1)),
-    targets=[targets.LambdaFunction(iam_policy_checker)]
-)
-
-# Also trigger on policy attachment events
-policy_attachment_rule = events.Rule(self, "IAMPolicyAttachmentRule",
-    event_pattern=events.EventPattern(
-        source=["aws.iam"],
-        detail_type=["AWS API Call via CloudTrail"],
-        detail={
-            "eventSource": ["iam.amazonaws.com"],
-            "eventName": [
-                "AttachUserPolicy",
-                "PutUserPolicy"
-            ]
-        }
-    ),
-    targets=[targets.LambdaFunction(iam_policy_checker)]
-)
-```
-
-**Lambda Code (lambda/iam_policy_checker/index.py)**:
-```python
-import boto3
-import os
-import json
-
-def handler(event, context):
-    iam = boto3.client('iam')
-    sns = boto3.client('sns')
-    topic_arn = os.environ.get('NOTIFICATION_TOPIC_ARN', '')
-    
-    # Get all users
-    users = iam.list_users()['Users']
-    
-    users_with_policies = []
-    
-    for user in users:
-        username = user['UserName']
-        
-        # Check for inline policies
-        inline_policies = iam.list_user_policies(UserName=username)['PolicyNames']
-        
-        # Check for attached policies
-        attached_policies = iam.list_attached_user_policies(UserName=username)['AttachedPolicies']
-        
-        if inline_policies or attached_policies:
-            users_with_policies.append({
-                'username': username,
-                'inline_policies': inline_policies,
-                'attached_policies': [p['PolicyName'] for p in attached_policies]
-            })
-    
-    # Send notification if any users have directly attached policies
-    if users_with_policies and topic_arn:
-        message = {
-            'subject': 'IAM Users with Directly Attached Policies',
-            'message': 'The following IAM users have policies attached directly to them instead of through groups:',
-            'users': users_with_policies,
-            'recommendation': 'Consider moving these policies to groups and adding users to the appropriate groups instead.'
-        }
-        
-        sns.publish(
-            TopicArn=topic_arn,
-            Subject=message['subject'],
-            Message=json.dumps(message, indent=2)
-        )
-    
-    return {
-        'statusCode': 200,
-        'users_with_policies_count': len(users_with_policies)
-    }
-```
-
-**Benefits**:
-- Identifies IAM users with directly attached policies
-- Provides recommendations for better IAM governance
-- Addresses FSBP IAM.16
-- No operational overhead once implemented
+# Programmatic Security Controls
+
+This document classifies each MSB security control as **AUTOMATED**, **DETECTIVE**, or **MANUAL** and summarises how it is implemented. Controls are deployed by the CDK stacks in this repository; no separate Lambda deployment or manual configuration step is required after `cdk deploy`.
+
+---
+
+## Control types
+
+| Type | Definition |
+|---|---|
+| **AUTOMATED** | The control is enforced or configured by the CDK deployment itself, without any human action after deploy. |
+| **DETECTIVE** | The control monitors the environment and alerts operators; it does not prevent the event from occurring, but it surfaces it quickly. |
+| **MANUAL** | The control cannot be fully automated and requires a human action (e.g., enabling hardware MFA on the root account). |
+
+---
+
+## AUTOMATED Controls
+
+These controls are applied or enforced on every `cdk deploy`. No manual steps are needed after deployment.
+
+### Account Security Contact (CIS 1.18 / FSBP Account.1)
+
+**Stack**: `IAMStack` — `create_security_contact()`
+
+The account SECURITY alternate contact is set via an `AwsCustomResource` that calls `account:PutAlternateContact`. The `on_update` handler is identical to `on_create`, so re-deploying with updated contact details keeps the contact current.
+
+**Prerequisite**: Provide both `--context notification_email=...` and `--context security_contact_phone=...`. If either value is absent, the custom resource is not created. A Security Hub Automation Rule in `SecurityRegionalStack` suppresses the corresponding FSBP Account.1 finding once the contact is set.
+
+### IAM Password Policy (CIS 1.8, 1.9, 1.11-1.14)
+
+**Stack**: `IAMStack`
+
+An `AWS::IAM::AccountPasswordPolicy` CloudFormation resource sets the account password policy: minimum length 16, uppercase, lowercase, symbols, numbers, 24-password reuse prevention. `MaxPasswordAge` is intentionally omitted in line with NIST SP 800-63B and CIS v3.0.0.
+
+### AWS Support Role (CIS 1.17)
+
+**Stack**: `IAMStack`
+
+IAM role `msb-aws-support-role` with `AWSSupportAccess` attached, assumed by `AccountRootPrincipal`.
+
+### IAM Access Analyzer (CIS 1.20)
+
+**Stack**: `IAMStack`
+
+`accessanalyzer.CfnAnalyzer` creates an ACCOUNT-type analyser (`msb-access-analyzer-{account}-{region}`).
+
+### S3 Block Public Access — Account Level (CIS 2.1.2)
+
+**Stack**: `S3SecurityStack`
+
+Custom resource calls `S3Control:PutPublicAccessBlock` with all four settings enabled for the entire account.
+
+### S3 Block Public Access — Bucket Level (CIS 2.1.5)
+
+**Stack**: `S3SecurityStack`
+
+Lambda function (`msb-s3-public-access-checker`) enforces bucket-level public access blocks on all buckets in the account. Triggered daily and on every `CreateBucket` event.
+
+### S3 Object Lock / WORM (FSBP S3.11 / CIS 3.11) — opt-in
+
+**Stack**: `LoggingStack`
+
+Enabled when `--context enable_object_lock=true` (default: off). The central logs bucket is created with Object Lock in Governance mode and a 365-day retention period. This setting must be selected before the first deploy; it cannot be retrofitted to an existing bucket.
+
+### EBS Encryption by Default (CIS 2.2.1)
+
+**Stack**: `KMSStack`
+
+Custom resources call `ec2:EnableEbsEncryptionByDefault` and `ec2:ModifyEbsDefaultKmsKeyId` to point the account-level EBS default to the `msb/ebs-key` KMS key.
+
+### KMS Key Rotation (FSBP KMS.4 / CIS 3.7)
+
+**Stack**: `KMSStack`
+
+Five CMKs are created with `enable_key_rotation=True`: master, CloudTrail, S3, RDS, and EBS keys.
+
+### CloudTrail (FSBP CloudTrail.1-4 / CIS 3.1-3.7)
+
+**Stack**: `LoggingStack`
+
+Multi-region trail `msb-cloudtrail` with KMS encryption, CloudWatch Logs delivery, log file validation, and advanced event selectors for all S3 and Lambda data events.
+
+**Control Tower note**: When `--context control_tower_managed=true`, the MSB trail is skipped and the CT organisation trail's log group is imported instead. The metric filters and alarms below still attach to that log group.
+
+### SNS Delivery Status Logging (FSBP SNS.2)
+
+**Stack**: `NotificationsRegionalStack` (non-global regions) and `LoggingStack` (global region)
+
+The CDK `CfnTopic` escape hatch sets `http_success_feedback_role_arn`, `sqs_success_feedback_role_arn`, and `lambda_success_feedback_role_arn` (plus corresponding failure and sample-rate attributes) on every MSB notifications topic. A dedicated IAM role grants SNS write access to CloudWatch Logs for delivery-status reporting. This satisfies FSBP SNS.2 without any custom resource.
+
+### SNS Topic Encryption (FSBP SNS.1)
+
+**Stack**: `NotificationsRegionalStack` / `LoggingStack`
+
+Each SNS topic is encrypted with a dedicated regional KMS key (`alias/msb-sns-notifications-{region}`).
+
+### AWS Config Recorder and Delivery Channel
+
+**Stack**: `LoggingRegionalStack`
+
+`CfnConfigurationRecorder` (all-supported) and `CfnDeliveryChannel` (6-hour snapshot, writes to `msb-logs-*`) deployed per region.
+
+**Control Tower note**: Skipped when `--context control_tower_managed=true`.
+
+### Security Hub + CIS v3.0.0 + FSBP Standards
+
+**Stack**: `SecurityRegionalStack`
+
+`CfnHub` and two `CfnStandard` resources enable both FSBP v1.0.0 and CIS AWS Foundations Benchmark v3.0.0 per region. Two Automation Rules suppress findings that the MSB already addresses programmatically (Account.1 security contact, root hardware-MFA findings).
+
+**Control Tower note**: Skipped when `--context control_tower_managed=true`.
+
+### GuardDuty with All Protection Plans
+
+**Stack**: `SecurityRegionalStack`
+
+`CfnDetector` with `enable=True`, 15-minute publishing frequency, and all available protection plans (S3, EKS audit logs, EBS malware, RDS login events, Lambda network logs, EKS runtime monitoring, runtime monitoring).
+
+**Control Tower note**: Skipped when `--context control_tower_managed=true`.
+
+### Inspector v2
+
+**Stack**: `SecurityRegionalStack`
+
+Custom resource enables Inspector v2 for EC2, ECR, and Lambda. Findings are forwarded to SNS via EventBridge.
+
+**Control Tower note**: Skipped when `--context control_tower_managed=true`.
+
+### Macie
+
+**Stack**: `SecurityRegionalStack`
+
+`macie.CfnSession` with `FIFTEEN_MINUTES` finding publishing. Findings are forwarded to SNS via EventBridge.
+
+**Control Tower note**: Skipped when `--context control_tower_managed=true`.
+
+### Default Security Group Remediation (CIS 5.4)
+
+**Stack**: `NetworkSecurityStack`
+
+Lambda function (`msb-secure-default-sg`) revokes all ingress rules and any custom egress rules from default security groups across all VPCs. Triggered daily and on every `AuthorizeSecurityGroupIngress`, `AuthorizeSecurityGroupEgress`, and `CreateSecurityGroup` event.
+
+### VPC Flow Logs (FSBP EC2.6 / CIS 3.9)
+
+**Stack**: `NetworkSecurityStack` → `VpcStack`
+
+Flow logs delivered to CloudWatch Logs (`/aws/vpc/flowlogs/{account}/{region}`) with a 1-year retention.
+
+### VPC Endpoints
+
+**Stack**: `VpcStack`
+
+Gateway endpoints for S3 and DynamoDB; interface endpoints for SSM, SSMMessages, EC2Messages, KMS, CloudWatch Logs, CloudWatch Monitoring, SQS, SNS, Secrets Manager, ECR API, ECR Docker, ECS, and Lambda.
+
+### WAFv2 Web ACL — opt-in
+
+**Stack**: `WafStack`
+
+Enabled when `--context enable_waf=true` (default: off). Deploys a Regional Web ACL per target region with five AWS Managed Rule Groups (CommonRuleSet, KnownBadInputsRuleSet, AmazonIpReputationList, AnonymousIpList, SQLiRuleSet) and a rate-limit rule (2000 requests per 5 minutes per IP, action: block). CloudWatch metrics and sampled requests are enabled on all rules. The Web ACL ARN is exported for manual association with ALBs, CloudFront distributions, or API Gateway stages.
+
+### AWS Config Managed Rules
+
+**Stack**: `ComplianceStack`
+
+A comprehensive set of AWS Config managed rules is deployed per region covering encryption, IAM, S3, CloudTrail, networking, Lambda, and SSM. See `docs/control_implementation_details.md` for the full list.
+
+---
+
+## DETECTIVE Controls
+
+These controls monitor the environment and alert on issues. They do not prevent events from occurring, but surface them quickly through CloudWatch alarms and SNS notifications.
+
+### CloudWatch Metric Filter Alarms (CIS 3.1-3.14, 4.4, 4.15-4.16)
+
+**Stack**: `LoggingStack`
+
+Thirteen CloudWatch metric filters and alarms watch the CloudTrail log group and alert on:
+- Unauthorized API calls (CIS 3.1)
+- Console sign-in without MFA (CIS 3.2)
+- CloudTrail configuration changes (CIS 3.5)
+- Console authentication failures — threshold 3 (CIS 3.6)
+- KMS CMK disabling or scheduled deletion (CIS 3.7)
+- S3 bucket policy changes (CIS 3.8)
+- AWS Config changes (CIS 3.9)
+- Network gateway changes (CIS 3.12)
+- Route table changes (CIS 3.13)
+- VPC changes (CIS 3.14)
+- IAM policy changes (CIS 4.4)
+- Security group changes (CIS 4.15)
+- Network ACL changes (CIS 4.16)
+
+All alarms notify the `msb-notifications-{region}` SNS topic.
+
+### Root Account Activity Monitoring (CIS 1.7 / FSBP IAM.7)
+
+**Stack**: `SecurityMonitoringStack`
+
+EventBridge rules alert on root account console sign-in and root account API calls.
+
+### Security Group Change Notifications (CIS 5.3)
+
+**Stack**: `SecurityMonitoringStack`
+
+EventBridge rule alerts on `AuthorizeSecurityGroupIngress`, `RevokeSecurityGroupIngress`, `CreateSecurityGroup`, `DeleteSecurityGroup`, and related events.
+
+### GuardDuty Findings Notifications
+
+**Stack**: `SecurityRegionalStack`
+
+EventBridge rule routes `Inspector2 Finding` and `Macie Finding` events to SNS. (GuardDuty findings are also forwarded to SNS via a separate EventBridge rule in `SecurityMonitoringStack`.) These rules remain active even when `control_tower_managed=true`.
+
+### IAM Policy Governance Monitoring (FSBP IAM.16)
+
+**Stack**: `IAMStack`
+
+Lambda function (`msb-iam-policy-checker`) reports on IAM users with directly attached policies. Runs daily and on `AttachUserPolicy` / `PutUserPolicy` events. Reports via SNS.
+
+### Remediation Lambda Error Alarms
+
+**Stack**: `NetworkSecurityStack`, `S3SecurityStack`, `IAMStack`
+
+Three CloudWatch alarms (one per remediation Lambda) fire when any Lambda invocation produces an error. Each alarm routes to the SNS notifications topic so that silent failures in the AUTOMATED remediation controls are surfaced immediately.
+
+| Alarm name | Lambda function |
+|---|---|
+| `msb-default-sg-remediation-errors-{region}` | `msb-secure-default-sg` |
+| `msb-s3-public-access-checker-errors-{region}` | `msb-s3-public-access-checker` |
+| `msb-iam-policy-checker-errors-{region}` | `msb-iam-policy-checker` |
+
+Without these alarms a failed Lambda would leave the account unmonitored with no indication of the failure.
+
+### Compliance Dashboard
+
+**Stack**: `ComplianceStack`
+
+CloudWatch dashboard (`MSB-Compliance-Dashboard`) displays `ComplianceByConfigRule` metrics for COMPLIANT and NON_COMPLIANT resources.
+
+---
+
+## MANUAL Controls
+
+These controls require human action and cannot be fully automated by CDK.
+
+### Root Account Hardware MFA (FSBP IAM.4 / IAM.6 / IAM.9)
+
+Physical hardware MFA must be registered to the root account via the AWS console. CDK cannot perform this action. Security Hub Automation Rules in `SecurityRegionalStack` suppress these findings so they do not clutter the posture score after the hardware token has been registered.
+
+### Root Account Password Rotation
+
+The root account password must be rotated manually in the AWS console.
+
+### Root Account Access Key Removal (CIS 1.4 / FSBP IAM.4)
+
+If root access keys exist they must be deleted via the AWS console or CLI. AWS Config rule `IAM_ROOT_ACCESS_KEY_CHECK` monitors for and reports any existing keys.
+
+### MFA for IAM Users (CIS 1.10 / FSBP IAM.5)
+
+Each IAM user must enrol their own MFA device. CDK enforces the password policy and Config reports non-compliant users, but MFA enrolment is a per-user human action.
+
+### WAF Resource Association
+
+After deploying `WafStack` with `--context enable_waf=true`, the Web ACL must be manually associated with ALBs, CloudFront distributions, or API Gateway stages. The Web ACL ARN is exported as `MSB-WAF-WebACLArn-{region}` to make this step straightforward.
+
+---
+
+## Control Tower Compatibility
+
+When `--context control_tower_managed=true` is passed, the following stacks skip resource creation because Control Tower already manages these services at the Organisation level:
+
+| Skipped resource | Reason |
+|---|---|
+| MSB CloudTrail (`msb-cloudtrail`) | CT deploys an organisation trail |
+| Config recorder and delivery channel | CT deploys a recorder per region |
+| GuardDuty detector | CT enables GuardDuty organisation-wide |
+| Security Hub + standards | CT enables Security Hub organisation-wide |
+| Inspector v2 | CT enables Inspector at the organisation level |
+| Macie session | CT enables Macie at the organisation level |
+
+All other controls (password policy, security contact, S3 block public access, EBS encryption, remediation Lambdas, CloudWatch metric filters, WAF, etc.) are deployed regardless of this flag.
+
+The CloudTrail log group name used by metric filters defaults to `aws-controltower/CloudTrailLogs` in CT mode. Override this with `--context cloudtrail_log_group_name=<name>` if your CT trail uses a different log group.
+
+---
 
 ## Implementation Strategy
 
-To implement these controls in the MSB CDK project:
+All controls in this repository are implemented directly in CDK Python stacks. No separate Lambda packaging or manual resource creation steps are required after `cdk deploy`. The recommended deployment flow is:
 
-1. **Create Lambda Function Code**:
-   - Create the necessary Lambda function code in a `lambda` directory within the project
-   - Organize functions by security domain (IAM, S3, EC2, etc.)
-
-2. **Update Existing Stacks**:
-   - Add the new controls to the appropriate existing stacks
-   - Ensure proper dependencies between resources
-
-3. **Testing**:
-   - Add unit tests for the new controls
-   - Test the Lambda functions with sample events
-
-4. **Documentation**:
-   - Update the compliance matrix to reflect the newly addressed controls
-   - Document the new controls in the control implementation details
-
-## Conclusion
-
-These programmatic controls can significantly reduce the residual risk in the AWS MSB CDK implementation without requiring extensive operational practices or adding many new AWS services. By focusing on automated monitoring, alerting, and remediation, these controls provide continuous security enforcement with minimal human intervention.
+1. Bootstrap the CDK toolkit in the target account and regions.
+2. Set context variables (email, phone, optional flags) either in `cdk.json` or on the command line.
+3. Run `cdk deploy --all` (or `cdk deploy --context target=global` then `cdk deploy --context target=regional` to sequence global and regional stacks).
+4. Confirm the SNS email subscription in each deployed region.
+5. Register hardware MFA on the root account (MANUAL).
+6. Associate the WAF Web ACL with any applicable resources if WAF was enabled (MANUAL).

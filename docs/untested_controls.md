@@ -2,15 +2,32 @@
 
 This document explains why certain controls in the compliance matrix are not covered by automated tests, categorizing them by reason for exclusion.
 
+Controls that were previously listed here but are now covered by the automated test suite have been removed from the tables below. See [Compliance Testing](compliance_testing.md) for details on what is tested.
+
+## Controls Now Covered by Automated Tests
+
+The following controls were previously untested. They are now validated by either unit tests (CDK synthesis) or post-deployment integration tests:
+
+| Control ID | Description | Test Type | Test Location |
+|------------|-------------|-----------|---------------|
+| GuardDuty.1 | GuardDuty detector enabled | Integration | `tests/integration/test_guardduty.py` |
+| SecurityHub.1 | Security Hub enabled with FSBP and CIS v3.0.0 standards | Integration | `tests/integration/test_security_hub.py` |
+| CloudTrail.1/CIS 3.1-3.3 | Trail logging with multi-region and log file validation | Integration | `tests/integration/test_cloudtrail.py` |
+| Config.1 | Config recorder running and delivery channel present | Integration | `tests/integration/test_config.py` |
+| IAM.9/CIS 1.8-1.12 | IAM password policy — all parameters | Integration | `tests/integration/test_iam.py` |
+| KMS.4/CIS 3.7 | KMS automatic key rotation on all 4 MSB keys | Integration | `tests/integration/test_kms.py` |
+| S3.1 | S3 account-level Block Public Access — all 4 settings | Integration | `tests/integration/test_s3_security.py` |
+| CIS 4.1-4.16 | CloudWatch metric filters and alarms | Unit | `tests/test_logging_stack.py`, `tests/test_compliance.py` |
+
+---
+
 ## 1. Runtime-Dependent Controls
 
-These controls can only be verified at runtime after deployment, not during CDK synthesis testing:
+These controls can only be fully verified at runtime after deployment, and automated integration tests do not yet cover them:
 
 | Control ID | Description | Framework Reference | Reason |
 |------------|-------------|---------------------|--------|
-| SecurityHub.1 | Security Hub enabled | FSBP, CIS 3.10, LOG.8 | While we test resource creation, integration functionality requires runtime verification |
-| IAM.8 | IAM Access Analyzer findings | FSBP, CIS 1.20, IR.6 | Finding generation and alerting requires runtime verification |
-| CIS 4.1-4.16 | Various monitoring controls | CIS 3.0.0 | Requires runtime verification of event patterns and alerting |
+| IAM.8 | IAM Access Analyzer findings | FSBP, CIS 1.20, IR.6 | Finding generation and alerting requires runtime events; the Analyzer's existence and ACTIVE status are tested, but actual finding detection requires real IAM configuration drift |
 
 ## 2. Documented Residual Risk Controls
 
@@ -37,8 +54,6 @@ These controls are partially implemented but have gaps that prevent complete tes
 | SSB.LOG.10 | Centralized log management | AWS SSB | Logs are centralized but full log analysis is not implemented |
 | SSB.IR.8 | Automated remediation | AWS SSB | Limited automated remediation is implemented |
 | SSB.NET.9 | Network segmentation | AWS SSB | Basic network segmentation is implemented but may not meet all requirements |
-| IAM.8 | IAM Access Analyzer alerts | FSBP, IR.6 | Access Analyzer is enabled but alerts are not fully implemented |
-| IAM.16 | IAM policies attached only to groups or roles | FSBP | Implementation exists but needs to be integrated into the main stack |
 
 ## 4. Out of Scope Controls
 
@@ -46,7 +61,7 @@ These controls are outside the scope of what the MSB implements:
 
 | Control ID | Description | Framework Reference | Scope Limitation |
 |------------|-------------|---------------------|------------------|
-| CIS 5.5 | VPC peering routing tables | CIS 3.0.0 | MSB creates secure VPCs but doesn't manage peering connections |
+| CIS 5.5 | VPC peering routing tables | CIS 3.0.0 | MSB creates secure VPCs but does not manage peering connections |
 
 ## 5. Manual Verification Required
 
@@ -61,11 +76,11 @@ These controls require manual verification procedures:
 
 ## Improving Test Coverage
 
-To improve test coverage for these controls:
+To further improve test coverage for the remaining controls:
 
-1. **Runtime Testing**: Implement integration tests that deploy resources and verify runtime behavior
-2. **Custom Assertions**: Develop specialized assertions for complex controls
-3. **Manual Verification Procedures**: Document manual verification procedures for controls that cannot be automatically tested
+1. **Expand integration tests**: Add post-deployment checks for VPC flow log delivery and CloudWatch alarm notification routing
+2. **Runtime event simulation**: For IAM.8, simulate IAM configuration drift in a test account and verify Access Analyzer findings are generated and alerted
+3. **Manual Verification Procedures**: Document step-by-step manual procedures for controls that cannot be automatically tested
 4. **Acceptance of Residual Risk**: For controls that are explicitly excluded, document the acceptance of residual risk
 
 See [Compliance Testing](compliance_testing.md) for more information on the testing framework and approach.

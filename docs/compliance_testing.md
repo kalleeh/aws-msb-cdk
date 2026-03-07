@@ -4,32 +4,77 @@ This document describes the testing framework used to validate compliance contro
 
 ## Overview
 
-The compliance testing framework uses AWS CDK's built-in testing capabilities to verify that resources are created with the correct properties and configurations to meet compliance requirements. The framework focuses on validating the following aspects:
+The compliance testing framework validates that the CDK implementation correctly enforces each security control. It operates at two levels:
 
-1. **Resource Creation**: Verifying that required resources are created
-2. **Resource Configuration**: Verifying that resources have the correct properties
-3. **Resource Relationships**: Verifying that resources are properly connected
-4. **Policy Validation**: Verifying that IAM policies have the correct permissions
+1. **Unit tests (CDK synthesis)**: Verify that CloudFormation templates are generated with the correct resources and properties. These run fast, require no AWS credentials, and form the primary regression barrier.
+2. **Integration tests (post-deployment)**: Verify that live AWS services are actually configured as required after a real deployment. These require credentials and an already-deployed MSB environment.
 
-## Testing Approach
+Together the two layers cover:
 
-### Synthesis Testing
+- **Resource creation**: Required resources are synthesised and deployed
+- **Resource configuration**: Resources have the correct properties
+- **Resource relationships**: Resources are properly connected (encryption keys, log destinations, SNS topics)
+- **Policy validation**: IAM policies have correct permissions
+- **Runtime state**: Services are active and operating (GuardDuty enabled, Config recording, etc.)
 
-Most compliance controls are tested using CDK's synthesis testing capabilities. This approach validates that the CDK code generates CloudFormation templates with the correct resources and properties. The `aws-cdk-lib/assertions` module provides the `Template` class, which allows us to make assertions about the synthesized CloudFormation template.
+---
 
-Example:
+## Unit Tests (CDK Synthesis)
+
+### What they validate
+
+Unit tests use the `aws-cdk-lib/assertions` `Template` class to assert on the synthesised CloudFormation template. They run entirely in-process — no AWS credentials or network access required.
+
+The suite currently contains **76 tests** across the following files:
+
+| File | What it covers |
+|------|----------------|
+| `tests/test_compliance.py` | Core compliance controls (IAM password policy, CloudTrail, KMS rotation, IAM.16 governance) and Control Tower managed mode |
+| `tests/test_logging_stack.py` | CloudTrail trail, S3 log bucket, KMS encryption, CIS 3.x metric filters and CloudWatch alarms |
+| `tests/test_app.py` | Full-stack synthesis smoke tests for all stacks |
+| `tests/test_network_security_stack.py` | VPC default-SG remediation, flow logs, security group rules |
+| `tests/test_vpc_stack.py` | VPC creation, subnet layout, VPC endpoints |
+| `tests/test_vpc_endpoints.py` | Interface and gateway endpoint presence |
+| `tests/test_sns_encryption.py` | SNS topic KMS encryption |
+| `tests/test_notifications_regional_stack.py` | Regional notifications topic |
+| `tests/test_waf_stack.py` | WAFv2 WebACL and managed rule groups |
+| `tests/test_multi_region.py` | Multi-region deployment patterns |
+| `tests/test_imports.py` | Package import sanity checks |
+
+### Control Tower managed mode
+
+`tests/test_compliance.py` contains a dedicated `TestControlTowerManagedMode` class that verifies correct behaviour when `control_tower_managed=True`:
+
+- GuardDuty detector is **not** created (Control Tower manages it)
+- Security Hub Hub resource is **not** created
+- Macie session is **not** created
+- AWS Config recorder is **not** created
+- AWS Config delivery channel is **not** created
+- CloudTrail trail is **not** created (CT provides the Organisation Trail)
+- CloudWatch alarms **are still created** (MSB's unique-value contribution on top of CT)
+
+A regression test confirms that the same resources **are** created in the default (non-CT) deployment.
+
+### CDK Nag
+
+All stacks are checked with `cdk_nag.AwsSolutionsChecks` during synthesis (applied in `app.py`). The project maintains **0 CDK Nag errors and 0 warnings** in both standalone mode and CT mode:
+
+```bash
+# Standalone
+cdk synth --context notification_email=you@example.com
+
+# Control Tower mode
+cdk synth --context notification_email=you@example.com --context control_tower_managed=true
+```
+
+### Example unit test
 
 ```python
 def test_cloudtrail_enabled_and_configured(self):
-    # GIVEN
     app = cdk.App()
-    
-    # WHEN
     stack = LoggingStack(app, "TestLoggingStack")
     template = Template.from_stack(stack)
-    
-    # THEN
-    # Verify CloudTrail is enabled with proper configuration
+
     template.has_resource_properties("AWS::CloudTrail::Trail", {
         "IsLogging": True,
         "IsMultiRegionTrail": True,
@@ -38,60 +83,91 @@ def test_cloudtrail_enabled_and_configured(self):
     })
 ```
 
-### Runtime Testing
+### Running unit tests
 
-Some controls require runtime verification after deployment. These controls are documented in the [Untested Controls](untested_controls.md) document. For these controls, we recommend implementing integration tests that deploy resources and verify runtime behavior.
+```bash
+# Run all unit tests (excludes integration tests)
+pytest tests/ --ignore=tests/integration -v
+
+# Run a specific test file
+pytest tests/test_compliance.py -v
+
+# Run with coverage
+pytest tests/ --ignore=tests/integration --cov=aws_msb_cdk
+```
+
+---
+
+## Integration Tests (Post-Deployment)
+
+Integration tests call live AWS APIs to confirm that deployed resources are in the expected state. They are skipped by default and only run when explicitly opted in.
+
+### Covered services
+
+| Test file | Controls validated |
+|-----------|-------------------|
+| `tests/integration/test_guardduty.py` | Detector exists, status=ENABLED, finding frequency=FIFTEEN_MINUTES, S3 protection, EBS malware protection |
+| `tests/integration/test_security_hub.py` | Hub enabled, FSBP standard READY, CIS v3.0.0 standard READY |
+| `tests/integration/test_cloudtrail.py` | Trail exists, is logging, log file validation enabled, multi-region enabled, CloudWatch Logs integration |
+| `tests/integration/test_config.py` | Recorder exists, recorder is recording, delivery channel exists, at least one Config rule present |
+| `tests/integration/test_iam.py` | Password policy (min length 16, uppercase, lowercase, numbers, symbols, reuse prevention 24), Access Analyzer ACTIVE |
+| `tests/integration/test_kms.py` | All 4 MSB key aliases present (master-key, cloudtrail-key, s3-key, ebs-key), rotation enabled on all |
+| `tests/integration/test_s3_security.py` | All 4 account-level S3 Block Public Access settings enabled |
+
+### Running integration tests
+
+Integration tests require live AWS credentials with read permissions to the deployed account and region:
+
+```bash
+MSB_INTEGRATION_TESTS=1 AWS_DEFAULT_REGION=us-east-1 pytest tests/integration/ -v
+```
+
+The `MSB_INTEGRATION_TESTS=1` environment variable is required. Omitting it causes all integration tests to be skipped automatically, preventing false failures on CI runners or environments with limited IAM permissions.
+
+---
 
 ## Test Organization
 
-Tests are organized by compliance control category:
+Tests are organised by compliance control category:
 
-1. **IAM Controls**: Tests for IAM-related controls
-2. **Logging Controls**: Tests for CloudTrail, CloudWatch, and other logging controls
-3. **Data Protection Controls**: Tests for encryption and data protection controls
-4. **Network Security Controls**: Tests for VPC, security groups, and other network controls
-5. **Monitoring Controls**: Tests for monitoring and alerting controls
+1. **IAM Controls**: Password policy, Access Analyzer, IAM.16 policy governance
+2. **Logging Controls**: CloudTrail, CloudWatch metric filters and alarms, S3 log bucket
+3. **Data Protection Controls**: KMS key rotation, S3 encryption, SNS encryption
+4. **Network Security Controls**: VPC, security groups, flow logs, VPC endpoints
+5. **Monitoring Controls**: CloudWatch alarms (CIS 4.1-4.16), GuardDuty, Security Hub
+6. **Config Controls**: Configuration recorder, delivery channel, Config rules
 
-## Custom Assertions
-
-For complex controls, we've developed custom assertions to simplify testing:
-
-1. **Policy Assertions**: Validate IAM policy statements
-2. **Encryption Assertions**: Validate encryption configurations
-3. **Logging Assertions**: Validate logging configurations
-
-## Running Tests
-
-To run the compliance tests:
-
-```bash
-pytest tests/test_compliance.py -v
-```
-
-## Improving Test Coverage
-
-To improve test coverage for untested controls:
-
-1. **Runtime Testing**: Implement integration tests that deploy resources and verify runtime behavior
-2. **Custom Assertions**: Develop specialized assertions for complex controls
-3. **Manual Verification Procedures**: Document manual verification procedures for controls that cannot be automatically tested
+---
 
 ## Recent Improvements
 
+### 76 unit tests (was 43)
+
+The test suite has grown significantly. Additions include:
+
+- CIS 3.x CloudWatch metric filter and alarm tests (all 13 filters and alarms explicitly verified)
+- Control Tower managed mode tests (`TestControlTowerManagedMode` — 8 tests)
+- WAF stack tests
+- Multi-region deployment tests
+- VPC endpoint tests
+- SNS encryption tests
+
+### Integration test suite
+
+A new `tests/integration/` directory provides post-deployment validation for the controls that previously required manual verification. See the [Untested Controls](untested_controls.md) document for the updated list of what remains untested.
+
 ### IAM.16 Testing
 
-We've added testing for IAM.16 (IAM policies attached only to groups or roles) by implementing a Lambda function that monitors and reports on IAM policies attached directly to users. The test verifies that:
-
-1. The Lambda function is created with the correct configuration
-2. EventBridge rules are set up to trigger the Lambda on a schedule and on policy attachment events
-3. The Lambda has the necessary permissions to check IAM policies and send notifications
+IAM.16 (IAM policies attached only to groups or roles) is tested by verifying that the monitoring Lambda, its EventBridge schedule rule, and its policy-attachment event rule are all synthesised correctly. The Lambda also has a CloudWatch Errors alarm so silent failures are caught.
 
 ### CloudTrail Log File Validation (CIS 3.3)
 
-We've improved testing for CloudTrail log file validation by explicitly verifying that the `EnableLogFileValidation` property is set to `True` in the CloudTrail configuration.
+The `EnableLogFileValidation` property is explicitly asserted in unit tests and verified at runtime via the integration test suite.
+
+---
 
 ## Future Enhancements
 
-1. **Integration Testing**: Implement integration tests for runtime-dependent controls
-2. **Policy Analysis**: Enhance policy analysis capabilities to validate complex IAM policies
-3. **Compliance Reporting**: Generate compliance reports based on test results
+1. **Expanded integration coverage**: Add post-deployment checks for VPC flow logs and CloudWatch alarm notification delivery
+2. **Policy analysis**: Enhance assertions for complex IAM policy documents
+3. **Compliance reporting**: Generate machine-readable compliance reports from pytest output
